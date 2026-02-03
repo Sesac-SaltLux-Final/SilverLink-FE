@@ -97,9 +97,9 @@ export default function ChatbotWidget() {
         try {
             const request: ChatRequest = {
                 message: userMessage.content,
-                guardianId: user.id,
-                elderlyId: elderlyId,
-                threadId: threadId,
+                guardian_id: user.id,
+                elderly_id: elderlyId,
+                thread_id: threadId,
             };
 
             const response = await chatbotApi.sendMessage(request);

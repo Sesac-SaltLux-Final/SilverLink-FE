@@ -2,9 +2,9 @@ import apiClient from './index';
 
 export interface ChatRequest {
     message: string;
-    threadId: string;
-    guardianId: number;
-    elderlyId: number;
+    thread_id: string;
+    guardian_id: number;
+    elderly_id: number;
 }
 
 export interface ChatResponse {

@@ -27,18 +27,17 @@ const CallTest = () => {
     setResult(null);
 
     try {
-      // Python AI의 schedule-call API 직접 호출
-      const response = await fetch('/api/callbot/call', {
+      // Python AI의 call API 호출 (배포 환경변수 지원)
+      const aiApiBaseUrl = import.meta.env.VITE_AI_API_BASE_URL || '';
+      const response = await fetch(`${aiApiBaseUrl}/api/callbot/call`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          schedule_id: 9999, // 테스트용 ID
-          elderly_id: 9999,
+          elderly_id: 682, // 테스트용 ID
           elderly_name: elderlyName,
           phone_number: phoneNumber,
-          scheduled_time: new Date().toISOString(),
         }),
       });
 

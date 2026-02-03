@@ -231,7 +231,7 @@ const SeniorOCR = () => {
 
   // LLM 검증 API 호출
   const validateMedicationOCR = async (ocrText: string): Promise<ValidationResult> => {
-    const AI_API_BASE_URL = import.meta.env.VITE_AI_API_BASE_URL || 'http://localhost:5000';
+    const AI_API_BASE_URL = import.meta.env.VITE_AI_API_BASE_URL || 'http://localhost:8000';
 
     const response = await fetch(`${AI_API_BASE_URL}/api/ocr/validate-medication`, {
       method: 'POST',
