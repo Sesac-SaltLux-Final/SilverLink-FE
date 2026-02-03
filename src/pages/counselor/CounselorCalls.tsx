@@ -129,7 +129,7 @@ const CounselorCalls = () => {
   const fetchCallRecords = useCallback(async (showLoading = true) => {
     try {
       if (showLoading) setIsLoading(true);
-      const callsResponse = await callReviewsApi.getCallRecordsForCounselor({ size: 50 });
+      const callsResponse = await callReviewsApi.getCallRecordsForCounselor({ size: 200 });
       setCallRecords(callsResponse.content);
     } catch (error) {
       console.error('Failed to fetch call records:', error);

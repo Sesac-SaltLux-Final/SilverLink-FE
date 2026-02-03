@@ -28,7 +28,7 @@ const CallTest = () => {
 
     try {
       // Python AI의 schedule-call API 직접 호출
-      const response = await fetch('/api/callbot/schedule-call', {
+      const response = await fetch('/api/callbot/call', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
