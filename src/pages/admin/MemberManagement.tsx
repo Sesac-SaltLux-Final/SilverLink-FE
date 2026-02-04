@@ -14,6 +14,7 @@ import {
   Users,
   X
 } from "lucide-react";
+import { toast } from "sonner";
 import { adminNavItems } from "@/config/adminNavItems";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -166,7 +167,22 @@ const MemberManagement = () => {
 
   useEffect(() => {
     fetchData();
+    fetchData();
   }, []);
+
+  const handleDeleteMember = async (userId: number, role: string) => {
+    if (!window.confirm("정말 이 회원을 삭제하시겠습니까? 삭제된 데이터는 복구할 수 없습니다.")) {
+      return;
+    }
+    try {
+      await usersApi.deleteUser(userId);
+      toast.success("회원이 삭제되었습니다.");
+      fetchData();
+    } catch (error) {
+      console.error("Failed to delete user:", error);
+      toast.error("회원 삭제에 실패했습니다.");
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -662,7 +678,10 @@ const MemberManagement = () => {
                                     수정
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuItem className="text-destructive" onClick={(e) => e.stopPropagation()}>
+                                  <DropdownMenuItem className="text-destructive" onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteMember(member.id, member.role);
+                                  }}>
                                     <Trash2 className="w-4 h-4 mr-2" />
                                     삭제
                                   </DropdownMenuItem>
@@ -768,7 +787,10 @@ const MemberManagement = () => {
                                       수정
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-destructive" onClick={(e) => e.stopPropagation()}>
+                                    <DropdownMenuItem className="text-destructive" onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteMember(counselor.id, 'COUNSELOR');
+                                    }}>
                                       <Trash2 className="w-4 h-4 mr-2" />
                                       삭제
                                     </DropdownMenuItem>
@@ -863,7 +885,10 @@ const MemberManagement = () => {
                                       수정
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-destructive" onClick={(e) => e.stopPropagation()}>
+                                    <DropdownMenuItem className="text-destructive" onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteMember(guardian.id, 'GUARDIAN');
+                                    }}>
                                       <Trash2 className="w-4 h-4 mr-2" />
                                       삭제
                                     </DropdownMenuItem>
@@ -979,7 +1004,10 @@ const MemberManagement = () => {
                                       수정
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-destructive" onClick={(e) => e.stopPropagation()}>
+                                    <DropdownMenuItem className="text-destructive" onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteMember(elderlyMember.userId, 'ELDERLY');
+                                    }}>
                                       <Trash2 className="w-4 h-4 mr-2" />
                                       삭제
                                     </DropdownMenuItem>

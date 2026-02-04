@@ -16,6 +16,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -33,6 +41,28 @@ import {
 import inquiriesApi from "@/api/inquiries";
 import usersApi from "@/api/users";
 import { InquiryResponse, MyProfileResponse } from "@/types/api";
+
+const INQUIRY_CATEGORIES = [
+  { value: "COMPLAINT", label: "불편사항" },
+  { value: "ERROR", label: "오류신고" },
+  { value: "SUGGESTION", label: "건의사항" },
+  { value: "OTHER", label: "기타문의" },
+];
+
+const formatDate = (dateString?: string) => {
+  if (!dateString) return '-';
+  try {
+    return new Date(dateString).toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch (e) {
+    return dateString;
+  }
+};
 
 const StatusBadge = ({ status }: { status: string }) => {
   switch (status) {
@@ -54,7 +84,9 @@ const GuardianInquiry = () => {
   const [userProfile, setUserProfile] = useState<MyProfileResponse | null>(null);
 
   // 새 문의 폼
+  // 새 문의 폼
   const [newTitle, setNewTitle] = useState("");
+  const [newCategory, setNewCategory] = useState("");
   const [newQuestionText, setNewQuestionText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -81,12 +113,18 @@ const GuardianInquiry = () => {
   };
 
   const handleCreateInquiry = async () => {
-    if (!newTitle.trim() || !newQuestionText.trim()) return;
+    if (!newTitle.trim() || !newQuestionText.trim() || !newCategory) {
+      toast.error("문의 유형, 제목, 내용을 모두 입력해주세요.");
+      return;
+    }
+
+    const categoryLabel = INQUIRY_CATEGORIES.find(c => c.value === newCategory)?.label || "문의";
+    const fullTitle = `[${categoryLabel}] ${newTitle}`;
 
     try {
       setIsSubmitting(true);
       await inquiriesApi.createInquiry({
-        title: newTitle,
+        title: fullTitle,
         questionText: newQuestionText,
       });
 
@@ -96,6 +134,7 @@ const GuardianInquiry = () => {
       // 폼 초기화 및 다이얼로그 닫기
       setNewTitle("");
       setNewQuestionText("");
+      setNewCategory("");
       setIsDialogOpen(false);
     } catch (error) {
       console.error('Failed to create inquiry:', error);
@@ -143,6 +182,21 @@ const GuardianInquiry = () => {
                 <DialogDescription>담당 상담사에게 문의를 보냅니다</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>문의 유형</Label>
+                  <Select value={newCategory} onValueChange={setNewCategory}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="유형 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INQUIRY_CATEGORIES.map((cat) => (
+                        <SelectItem key={cat.value} value={cat.value}>
+                          {cat.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="space-y-2">
                   <Label>제목</Label>
                   <Input
@@ -237,7 +291,7 @@ const GuardianInquiry = () => {
                         </div>
                         <div className="text-right text-xs text-muted-foreground whitespace-nowrap hidden sm:block">
                           <p>{inquiry.elderlyName} 어르신</p>
-                          <p>{inquiry.createdAt?.split('T')[0]}</p>
+                          <p>{formatDate(inquiry.createdAt)}</p>
                         </div>
                       </div>
                     </AccordionTrigger>
@@ -268,7 +322,7 @@ const GuardianInquiry = () => {
                                 <Badge className="bg-primary hover:bg-primary">답변</Badge>
                                 <span className="font-medium text-sm">상담사</span>
                                 <span className="text-xs text-muted-foreground ml-auto">
-                                  {inquiry.answeredAt?.split('T')[0]}
+                                  {formatDate(inquiry.answeredAt)}
                                 </span>
                               </div>
                               <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">

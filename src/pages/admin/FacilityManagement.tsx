@@ -28,7 +28,8 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { mapApi } from "@/api/map";
-import { WelfareFacilityResponse, WelfareFacilityRequest } from "@/types/api";
+import { WelfareFacilityResponse, WelfareFacilityRequest, ElderlySummaryResponse } from "@/types/api";
+import elderlyApi from "@/api/elderly";
 import { Trash2, Plus, Pencil, MapPin, Search, Loader2, CheckCircle } from "lucide-react";
 import {
     Tooltip,
@@ -63,6 +64,27 @@ export default function FacilityManagement() {
     const [isGeocodingLoading, setIsGeocodingLoading] = useState(false);
     const [geocodingSuccess, setGeocodingSuccess] = useState(false);
     const [geocodingError, setGeocodingError] = useState<string | null>(null);
+
+    // Elderly Search State
+    const [isElderlyModalOpen, setIsElderlyModalOpen] = useState(false);
+    const [elderlyList, setElderlyList] = useState<ElderlySummaryResponse[]>([]);
+    const [searchTerm, setSearchTerm] = useState("");
+
+    // Map Effect
+    useEffect(() => {
+        if ((!isCreateOpen && !isEditOpen) || !formData.latitude || !formData.longitude) return;
+
+        const timer = setTimeout(() => {
+            if (!window.kakao || !window.kakao.maps) return;
+            const container = document.getElementById('facility-map');
+            if (!container) return;
+
+            const options = { center: new window.kakao.maps.LatLng(formData.latitude, formData.longitude), level: 3 };
+            const map = new window.kakao.maps.Map(container, options);
+            new window.kakao.maps.Marker({ position: new window.kakao.maps.LatLng(formData.latitude, formData.longitude), map: map });
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [isCreateOpen, isEditOpen, formData.latitude, formData.longitude]);
 
     // Form Data
     const initialFormData: WelfareFacilityRequest = {
@@ -269,6 +291,47 @@ export default function FacilityManagement() {
         }
     };
 
+    const openElderlySearch = async () => {
+        setIsElderlyModalOpen(true);
+        if (elderlyList.length === 0) {
+            try {
+                const data = await elderlyApi.getAllElderlyForAdmin();
+                setElderlyList(data);
+            } catch (e) {
+                console.error(e);
+                alert("어르신 목록을 불러오지 못했습니다.");
+            }
+        }
+    };
+
+    const handleElderlySelect = (elderly: ElderlySummaryResponse) => {
+        if (!elderly.fullAddress) {
+            alert("선택하신 어르신의 주소 정보가 없습니다.");
+            return;
+        }
+
+        setFormData(prev => ({
+            ...prev,
+            address: elderly.fullAddress || ""
+        }));
+
+        // Geocoding
+        if (window.kakao && window.kakao.maps && window.kakao.maps.services) {
+            const geocoder = new window.kakao.maps.services.Geocoder();
+            geocoder.addressSearch(elderly.fullAddress, (result: any, status: any) => {
+                if (status === window.kakao.maps.services.Status.OK && result.length > 0) {
+                    const lat = parseFloat(result[0].y);
+                    const lng = parseFloat(result[0].x);
+                    setFormData(prev => ({ ...prev, latitude: lat, longitude: lng }));
+                    setGeocodingSuccess(true);
+                } else {
+                    setGeocodingError("주소 좌표 변환 실패");
+                }
+            });
+        }
+        setIsElderlyModalOpen(false);
+    };
+
     // Shared Form Component
     const renderForm = () => (
         <div className="grid gap-4 py-4">
@@ -311,6 +374,9 @@ export default function FacilityManagement() {
                         <Search className="w-4 h-4 mr-2" />
                         주소 검색
                     </Button>
+                    <Button type="button" variant="outline" onClick={openElderlySearch}>
+                        어르신 주소
+                    </Button>
                 </div>
             </div>
             {/* 좌표 상태 표시 (위도/경도 입력 필드 대신) */}
@@ -341,6 +407,26 @@ export default function FacilityManagement() {
                     )}
                 </div>
             </div>
+            {/* Map Preview */}
+            <div className="grid grid-cols-4 items-start gap-4">
+                <Label className="text-right pt-2">위치 확인</Label>
+                <div className="col-span-3">
+                    <div id="facility-map" className="w-full h-[200px] border rounded bg-gray-100 flex items-center justify-center text-gray-400">
+                        {!formData.latitude ? "주소를 입력하면 지도가 표시됩니다" : "지도 로딩 중..."}
+                    </div>
+                </div>
+            </div>
+
+            {/* Map Preview */}
+            <div className="grid grid-cols-4 items-start gap-4">
+                <Label className="text-right pt-2">위치 확인</Label>
+                <div className="col-span-3">
+                    <div id="facility-map" className="w-full h-[200px] border rounded bg-gray-100 flex items-center justify-center text-gray-400">
+                        {!formData.latitude ? "주소를 입력하면 지도가 표시됩니다" : "지도 로딩 중..."}
+                    </div>
+                </div>
+            </div>
+
             <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="phone" className="text-right">연락처</Label>
                 <Input id="phone" name="phone" value={formData.phone} onChange={handleInputChange} className="col-span-3" placeholder="예: 02-1234-5678" />
@@ -351,12 +437,12 @@ export default function FacilityManagement() {
             </div>
             <div className="grid grid-cols-4 items-start gap-4">
                 <Label htmlFor="description" className="text-right pt-2">상세정보</Label>
-                <Textarea 
-                    id="description" 
-                    name="description" 
-                    value={formData.description || ''} 
+                <Textarea
+                    id="description"
+                    name="description"
+                    value={formData.description || ''}
                     onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    className="col-span-3" 
+                    className="col-span-3"
                     placeholder="시설의 상세 정보, 제공 서비스, 특징 등을 입력하세요"
                     rows={4}
                 />
@@ -367,120 +453,139 @@ export default function FacilityManagement() {
     return (
         <DashboardLayout role="admin" userName={user?.name || "관리자"} navItems={adminNavItems}>
             <TooltipProvider>
-            <div className="container mx-auto p-6">
-                <div className="flex justify-between items-center mb-6">
-                    <h1 className="text-2xl font-bold">사회복지시설 관리</h1>
-                    <div className="flex gap-2">
-                        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                            <DialogTrigger asChild>
-                                <Button onClick={openCreateModal}>
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    시설 등록
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-                                <DialogHeader>
-                                    <DialogTitle>새 시설 등록</DialogTitle>
-                                </DialogHeader>
-                                {renderForm()}
-                                <DialogFooter>
-                                    <Button type="submit" onClick={handleCreate}>등록</Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
+                <div className="container mx-auto p-6">
+                    <div className="flex justify-between items-center mb-6">
+                        <h1 className="text-2xl font-bold">사회복지시설 관리</h1>
+                        <div className="flex gap-2">
+                            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                                <DialogTrigger asChild>
+                                    <Button onClick={openCreateModal}>
+                                        <Plus className="w-4 h-4 mr-2" />
+                                        시설 등록
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                                    <DialogHeader>
+                                        <DialogTitle>새 시설 등록</DialogTitle>
+                                    </DialogHeader>
+                                    {renderForm()}
+                                    <DialogFooter>
+                                        <Button type="submit" onClick={handleCreate}>등록</Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
                     </div>
-                </div>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>등록된 시설 목록 ({facilities.length})</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>ID</TableHead>
-                                    <TableHead>시설명</TableHead>
-                                    <TableHead>유형</TableHead>
-                                    <TableHead>주소</TableHead>
-                                    <TableHead>연락처</TableHead>
-                                    <TableHead className="text-right">관리</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {facilities.length === 0 ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>등록된 시설 목록 ({facilities.length})</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center h-24">
-                                            데이터가 없습니다.
-                                        </TableCell>
+                                        <TableHead>ID</TableHead>
+                                        <TableHead>시설명</TableHead>
+                                        <TableHead>유형</TableHead>
+                                        <TableHead>주소</TableHead>
+                                        <TableHead>연락처</TableHead>
+                                        <TableHead className="text-right">관리</TableHead>
                                     </TableRow>
-                                ) : (
-                                    facilities.map((facility) => (
-                                        <TableRow key={facility.id}>
-                                            <TableCell>{facility.id}</TableCell>
-                                            <TableCell className="font-medium">{facility.name}</TableCell>
-                                            <TableCell>
-                                                <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
-                                                    {facility.typeDescription || facility.type}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell>{facility.address}</TableCell>
-                                            <TableCell>{facility.phone || '-'}</TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                onClick={() => openEditModal(facility)}
-                                                            >
-                                                                <Pencil className="w-4 h-4 text-blue-500" />
-                                                            </Button>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            <p>시설 정보 수정</p>
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                                                                onClick={() => handleDelete(facility.id)}
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </Button>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            <p>시설 삭제</p>
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                </div>
+                                </TableHeader>
+                                <TableBody>
+                                    {facilities.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={6} className="text-center h-24">
+                                                데이터가 없습니다.
                                             </TableCell>
                                         </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                                    ) : (
+                                        facilities.map((facility) => (
+                                            <TableRow key={facility.id}>
+                                                <TableCell>{facility.id}</TableCell>
+                                                <TableCell className="font-medium">{facility.name}</TableCell>
+                                                <TableCell>
+                                                    <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
+                                                        {facility.typeDescription || facility.type}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>{facility.address}</TableCell>
+                                                <TableCell>{facility.phone || '-'}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex justify-end gap-2">
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={() => openEditModal(facility)}
+                                                                >
+                                                                    <Pencil className="w-4 h-4 text-blue-500" />
+                                                                </Button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p>시설 정보 수정</p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                                    onClick={() => handleDelete(facility.id)}
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </Button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p>시설 삭제</p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
 
-                {/* Edit Modal */}
-                <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                    <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-                        <DialogHeader>
-                            <DialogTitle>시설 정보 수정</DialogTitle>
-                        </DialogHeader>
-                        {renderForm()}
-                        <DialogFooter>
-                            <Button type="submit" onClick={handleUpdate}>수정 내용 저장</Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-            </div>
+                    {/* Edit Modal */}
+                    <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                            <DialogHeader>
+                                <DialogTitle>시설 정보 수정</DialogTitle>
+                            </DialogHeader>
+                            {renderForm()}
+                            <DialogFooter>
+                                <Button type="submit" onClick={handleUpdate}>수정 내용 저장</Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                </div>
             </TooltipProvider>
+
+            {/* Elderly Selection Modal */}
+            <Dialog open={isElderlyModalOpen} onOpenChange={setIsElderlyModalOpen}>
+                <DialogContent className="sm:max-w-[500px] h-[600px] flex flex-col">
+                    <DialogHeader><DialogTitle>어르신 주소 불러오기</DialogTitle></DialogHeader>
+                    <div className="flex gap-2 mb-4">
+                        <Input placeholder="이름 검색" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                    </div>
+                    <div className="flex-1 overflow-y-auto border rounded p-2 space-y-2">
+                        {elderlyList.filter(e => e.name.includes(searchTerm)).map(e => (
+                            <div key={e.userId} className="p-3 border rounded hover:bg-gray-50 bg-white cursor-pointer flex justify-between items-center" onClick={() => handleElderlySelect(e)}>
+                                <div><p className="font-bold">{e.name}</p><p className="text-xs text-gray-500">{e.fullAddress || "주소 없음"}</p></div>
+                                <Button size="sm" variant="ghost">선택</Button>
+                            </div>
+                        ))}
+                        {elderlyList.length === 0 && <p className="text-center py-4 text-gray-500">데이터 로딩 중...</p>}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </DashboardLayout>
     );
 }

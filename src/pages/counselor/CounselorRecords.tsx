@@ -55,6 +55,7 @@ const CounselorRecords = () => {
     result: "",
     followUp: "",
     status: "COMPLETED" as "COMPLETED" | "IN_PROGRESS" | "SCHEDULED",
+    duration: "10", // 기본값 10분
   });
 
   // Fetch assignments on mount
@@ -112,7 +113,9 @@ const CounselorRecords = () => {
       content: "",
       result: "",
       followUp: "",
+      followUp: "",
       status: "COMPLETED",
+      duration: "10",
     });
     setIsDialogOpen(true);
   };
@@ -128,12 +131,18 @@ const CounselorRecords = () => {
       type: record.type,
       category: record.category,
       summary: record.summary,
-      content: record.content,
+      content: record.content.replace(/^\[상담시간:\s*\d+분\]\s*/, ''),
       result: record.result,
       followUp: record.followUp,
       status: record.status,
+      duration: extractDuration(record.content),
     });
     setIsDialogOpen(true);
+  };
+
+  const extractDuration = (content: string) => {
+    const match = content.match(/^\[상담시간:\s*(\d+)분\]/);
+    return match ? match[1] : "";
   };
 
   const handleViewRecord = (record: CounselingRecordResponse) => {
@@ -155,7 +164,8 @@ const CounselorRecords = () => {
         type: formData.type as any,
         category: formData.category,
         summary: formData.summary,
-        content: formData.content,
+        // 소요 시간을 content 앞에 추가
+        content: formData.duration ? `[상담시간: ${formData.duration}분]\n\n${formData.content}` : formData.content,
         result: formData.result,
         followUp: formData.followUp,
         status: (formData.status || "COMPLETED") as any
@@ -465,12 +475,27 @@ const CounselorRecords = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label>상담 시간</Label>
+                <Label>상담 시간 (시작)</Label>
                 <Input
                   type="time"
                   value={formData.time}
                   onChange={(e) => setFormData({ ...formData, time: e.target.value })}
                 />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>소요 시간 (분)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  step="5"
+                  value={formData.duration}
+                  onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                  placeholder="예: 30"
+                  className="w-32"
+                />
+                <span className="text-sm text-muted-foreground whitespace-nowrap">분</span>
               </div>
             </div>
             <div className="space-y-2">

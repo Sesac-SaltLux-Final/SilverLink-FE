@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Phone, Loader2, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Phone, Loader2, CheckCircle, XCircle, AlertCircle, Radio } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { adminNavItems } from "@/config/adminNavItems";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface TestResult {
@@ -15,16 +16,42 @@ interface TestResult {
   data?: any;
 }
 
+interface LiveMessage {
+  id: number;
+  type: 'PROMPT' | 'REPLY';
+  content: string;
+  timestamp: Date;
+}
+
+const formatTimeAMPM = (date: Date) => {
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const h = hours % 12 || 12;
+  const m = minutes.toString().padStart(2, '0');
+  return `${h}:${m} ${ampm}`;
+};
+
 const CallTest = () => {
   const { user } = useAuth();
   const [phoneNumber, setPhoneNumber] = useState("+821012345678");
   const [elderlyName, setElderlyName] = useState("테스트 어르신");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<TestResult | null>(null);
+  
+  // 실시간 모니터링 상태
+  const [activeCallId, setActiveCallId] = useState<number | null>(null);
+  const [liveMessages, setLiveMessages] = useState<LiveMessage[]>([]);
+  const [sseConnected, setSseConnected] = useState(false);
+  const [isMonitoring, setIsMonitoring] = useState(false);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const liveContainerRef = useRef<HTMLDivElement>(null);
 
   const handleTestCall = async () => {
     setIsLoading(true);
     setResult(null);
+    setLiveMessages([]);
+    setActiveCallId(null);
 
     try {
       // Python AI의 call API 호출 (배포 환경변수 지원)
@@ -49,6 +76,12 @@ const CallTest = () => {
           message: '통화 요청이 성공적으로 전송되었습니다!',
           data: data,
         });
+        
+        // callId가 있으면 실시간 모니터링 시작
+        if (data.call_id) {
+          setActiveCallId(data.call_id);
+          setIsMonitoring(true);
+        }
       } else {
         setResult({
           status: 'error',
@@ -65,6 +98,79 @@ const CallTest = () => {
       setIsLoading(false);
     }
   };
+
+  // SSE 연결 관리
+  useEffect(() => {
+    if (!activeCallId || !isMonitoring) {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+        setSseConnected(false);
+      }
+      return;
+    }
+
+    // SSE 연결
+    const eventSource = new EventSource(`/api/internal/callbot/calls/${activeCallId}/sse`);
+    eventSourceRef.current = eventSource;
+
+    eventSource.onopen = () => {
+      console.log(`✅ [SSE] 연결 성공: callId=${activeCallId}, readyState=${eventSource.readyState}`);
+      setSseConnected(true);
+    };
+
+    eventSource.addEventListener('connect', () => {
+      console.log(`🤝 [SSE] 서버 연결 확인됨: callId=${activeCallId}`);
+    });
+
+    eventSource.addEventListener('prompt', (e: MessageEvent) => {
+      console.log(`📤 [SSE] AI 발화 수신: callId=${activeCallId}, data=${e.data.substring(0, 50)}...`);
+      const newLog: LiveMessage = {
+        id: Date.now(),
+        type: 'PROMPT',
+        content: e.data,
+        timestamp: new Date()
+      };
+      setLiveMessages(prev => [...prev, newLog]);
+    });
+
+    eventSource.addEventListener('reply', (e: MessageEvent) => {
+      console.log(`📥 [SSE] 어르신 응답 수신: callId=${activeCallId}, data=${e.data.substring(0, 50)}...`);
+      const newLog: LiveMessage = {
+        id: Date.now(),
+        type: 'REPLY',
+        content: e.data,
+        timestamp: new Date()
+      };
+      setLiveMessages(prev => [...prev, newLog]);
+    });
+
+    eventSource.addEventListener('callEnded', () => {
+      console.log('✅ [SSE] 통화 종료 이벤트 수신');
+      eventSource.close();
+      setSseConnected(false);
+      setIsMonitoring(false);
+    });
+
+    eventSource.onerror = (e) => {
+      console.error(`❌ [SSE] 에러 발생: callId=${activeCallId}, readyState=${eventSource.readyState}`, e);
+      setSseConnected(false);
+      eventSource.close();
+    };
+
+    return () => {
+      console.log(`🔌 [SSE] 컴포넌트 언마운트로 연결 종료: callId=${activeCallId}`);
+      eventSource.close();
+      setSseConnected(false);
+    };
+  }, [activeCallId, isMonitoring]);
+
+  // 자동 스크롤
+  useEffect(() => {
+    if (liveContainerRef.current && isMonitoring) {
+      liveContainerRef.current.scrollTop = liveContainerRef.current.scrollHeight;
+    }
+  }, [liveMessages, isMonitoring]);
 
   return (
     <DashboardLayout
@@ -168,6 +274,85 @@ const CallTest = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* 실시간 모니터링 카드 */}
+        {isMonitoring && activeCallId && (
+          <Card className="shadow-card border-0">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Radio className="w-5 h-5 text-primary" />
+                  실시간 통화 모니터링
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  {sseConnected && (
+                    <Badge variant="outline" className="animate-pulse text-red-600 border-red-600">
+                      ● Live
+                    </Badge>
+                  )}
+                  <Badge variant="secondary">Call ID: {activeCallId}</Badge>
+                </div>
+              </div>
+              <CardDescription>
+                실시간으로 통화 내용을 확인하고 있습니다
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div ref={liveContainerRef} className="bg-secondary/30 rounded-xl p-4 h-[400px] overflow-y-auto">
+                <div className="space-y-3">
+                  {liveMessages.length === 0 ? (
+                    <div className="flex h-full items-center justify-center text-muted-foreground">
+                      <div className="text-center">
+                        <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                        <p>대화 내용을 기다리고 있습니다...</p>
+                      </div>
+                    </div>
+                  ) : (
+                    liveMessages.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`flex ${msg.type === 'PROMPT' ? 'justify-start' : 'justify-end'}`}
+                      >
+                        <div className="max-w-[80%]">
+                          <div
+                            className={`rounded-lg p-3 ${msg.type === 'PROMPT'
+                              ? 'bg-primary/10 text-foreground'
+                              : 'bg-primary text-primary-foreground'
+                              }`}
+                          >
+                            <div className="text-xs opacity-70 mb-1">
+                              {msg.type === 'PROMPT' ? 'AI 상담봇' : elderlyName}
+                            </div>
+                            <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
+                          </div>
+                          <div className="text-[11px] opacity-50 mt-1 text-right">
+                            {formatTimeAMPM(msg.timestamp)}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsMonitoring(false);
+                    if (eventSourceRef.current) {
+                      eventSourceRef.current.close();
+                      eventSourceRef.current = null;
+                      setSseConnected(false);
+                    }
+                  }}
+                >
+                  모니터링 중지
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* 사용 안내 */}
         <Card className="shadow-card border-0">

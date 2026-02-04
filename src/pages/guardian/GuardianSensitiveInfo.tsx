@@ -162,6 +162,8 @@ const GuardianSensitiveInfo = () => {
     try {
       setLoading(true);
       const data = await accessRequestsApi.getMyRequests();
+      console.log("[GuardianSensitiveInfo] fetchRequests raw data:", data);
+
       const mappedRequests: RequestItem[] = data.map(r => ({
         id: r.id,
         elderlyName: r.elderlyName,
@@ -176,9 +178,11 @@ const GuardianSensitiveInfo = () => {
         reviewedBy: r.reviewedBy,
         accessGranted: r.accessGranted,
       }));
+      console.log("[GuardianSensitiveInfo] mappedRequests:", mappedRequests);
       setRequests(mappedRequests);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to fetch requests:", error);
+      toast.error("요청 목록을 불러오는 중 오류가 발생했습니다.");
       setRequests([]);
     } finally {
       setLoading(false);
