@@ -32,8 +32,26 @@ export const getAllElderlyForAdmin = async (): Promise<ElderlySummaryResponse[]>
     return response.data;
 };
 
+/**
+ * 관리자용 어르신 이름 검색
+ * GET /api/admin/elderly/search?name={name}
+ */
+export const searchByName = async (name: string): Promise<ElderlySummaryResponse[]> => {
+    const response = await apiClient.get<ElderlySummaryResponse[]>('/api/admin/elderly/search', {
+        params: { name }
+    });
+    return response.data;
+};
+
+export const registerElderly = async (data: any): Promise<ElderlySummaryResponse> => {
+    const response = await apiClient.post<ElderlySummaryResponse>('/api/admin/elderly', data);
+    return response.data;
+};
+
 export default {
     getSummary,
     getHealthInfo,
     getAllElderlyForAdmin,
+    searchByName,
+    registerElderly,
 };

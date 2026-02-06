@@ -104,6 +104,10 @@ const GuardianComplaint = () => {
 
   // 민원 등록
   const handleSubmit = async () => {
+    if (!formCategory) {
+      toast.error("불편 유형을 선택해주세요.");
+      return;
+    }
     if (!formTitle.trim() || !formContent.trim()) {
       toast.error("제목과 내용을 입력해주세요.");
       return;
@@ -153,19 +157,19 @@ const GuardianComplaint = () => {
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">불편 사항 접수</h1>
-            <p className="text-muted-foreground mt-1">서비스 이용 중 불편한 점을 접수하세요</p>
+            <h1 className="text-2xl font-bold text-foreground">불편사항 신고</h1>
+            <p className="text-muted-foreground mt-1">서비스 이용 중 불편한 점을 신고하세요</p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="w-4 h-4 mr-2" />
-                불편 접수하기
+                불편사항 신고하기
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>불편 사항 접수</DialogTitle>
+                <DialogTitle>불편사항 신고</DialogTitle>
                 <DialogDescription>불편 사항을 관리자에게 전달합니다</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">

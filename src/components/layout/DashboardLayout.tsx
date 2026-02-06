@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import ChatbotWidget from "@/components/chatbot/ChatbotWidget";
 import NotificationDropdown from "@/components/notification/NotificationDropdown";
 import accessRequestsApi from "@/api/accessRequests";
+import { EmergencyAlertPopup } from "@/components/alert/EmergencyAlertPopup";
 
 interface NavItem {
   title: string;
@@ -258,7 +259,7 @@ const DashboardLayout = ({
                     <User className="w-4 h-4 mr-2" />
                     내 프로필
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/settings')} className="cursor-pointer">
                     <Settings className="w-4 h-4 mr-2" />
                     설정
                   </DropdownMenuItem>

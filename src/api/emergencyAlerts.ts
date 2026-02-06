@@ -33,7 +33,15 @@ export interface EmergencyAlertSummary {
     timeAgo: string;
 }
 
-// 수신자별 알림 응답
+// 수신자별 알림 응답 (백엔드 원본 구조)
+interface RecipientAlertRawResponse {
+    alertId: number;
+    alert: EmergencyAlertSummary;
+    isRead: boolean;
+    readAt: string | null;
+}
+
+// 수신자별 알림 응답 (프론트엔드에서 사용하는 플랫 구조)
 export interface RecipientAlertResponse {
     alertId: number;
     severity: Severity;
@@ -132,8 +140,23 @@ export const getAlertDetail = async (alertId: number): Promise<EmergencyAlertDet
  * GET /api/emergency-alerts/unread
  */
 export const getUnreadAlerts = async (): Promise<RecipientAlertResponse[]> => {
-    const response = await apiClient.get<ApiResponse<RecipientAlertResponse[]>>('/api/emergency-alerts/unread');
-    return response.data.data || [];
+    const response = await apiClient.get<ApiResponse<RecipientAlertRawResponse[]>>('/api/emergency-alerts/unread');
+    const rawData = response.data.data || [];
+
+    // 백엔드 중첩 구조를 프론트엔드 플랫 구조로 변환
+    return rawData.map((item) => ({
+        alertId: item.alertId,
+        severity: item.alert?.severity ?? 'CRITICAL' as Severity,
+        severityText: item.alert?.severityText ?? '긴급',
+        alertType: item.alert?.alertType ?? 'HEALTH_RISK' as AlertType,
+        alertTypeText: item.alert?.alertTypeText ?? '긴급위험',
+        title: item.alert?.title ?? '긴급 알림',
+        elderlyName: item.alert?.elderlyName ?? '알 수 없음',
+        elderlyAge: item.alert?.elderlyAge ?? 0,
+        isRead: item.isRead,
+        createdAt: item.alert?.createdAt ?? '',
+        timeAgo: item.alert?.timeAgo ?? '',
+    }));
 };
 
 /**

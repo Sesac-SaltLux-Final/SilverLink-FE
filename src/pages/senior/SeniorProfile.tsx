@@ -5,14 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+
 import {
   Select,
   SelectContent,
@@ -28,8 +21,6 @@ import {
   Clock,
   Calendar,
   Loader2,
-  CheckCircle,
-  XCircle,
   AlertCircle,
 } from "lucide-react";
 import { getMySchedule, createScheduleChangeRequest, getMyChangeRequests, CallScheduleResponse, ScheduleChangeRequest } from "@/api/callSchedules";
@@ -49,12 +40,11 @@ const SeniorProfile = () => {
   const [loading, setLoading] = useState(true);
   const [schedule, setSchedule] = useState<CallScheduleResponse | null>(null);
   const [requests, setRequests] = useState<ScheduleChangeRequest[]>([]);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
   // 변경 요청 폼
-  const [newTime, setNewTime] = useState("09:00");
-  const [newDays, setNewDays] = useState<string[]>(["MON", "WED", "FRI"]);
+  const [selectedTime, setSelectedTime] = useState("09:00");
+  const [selectedDays, setSelectedDays] = useState<string[]>(["MON", "WED", "FRI"]);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -62,6 +52,7 @@ const SeniorProfile = () => {
 
   const loadData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [scheduleData, requestsData] = await Promise.all([
         getMySchedule(),
@@ -71,20 +62,22 @@ const SeniorProfile = () => {
       setRequests(requestsData);
 
       if (scheduleData.preferredCallTime) {
-        setNewTime(scheduleData.preferredCallTime);
+        setSelectedTime(scheduleData.preferredCallTime);
       }
       if (scheduleData.preferredCallDays?.length > 0) {
-        setNewDays(scheduleData.preferredCallDays);
+        setSelectedDays(scheduleData.preferredCallDays);
       }
-    } catch (error) {
-      console.error("Failed to load schedule:", error);
+    } catch (err: any) {
+      console.error("Failed to load schedule:", err);
+      const message = err.response?.data?.message || err.message || "알 수 없는 오류";
+      setError(message);
     } finally {
       setLoading(false);
     }
   };
 
   const handleSubmitRequest = async () => {
-    if (newDays.length === 0) {
+    if (selectedDays.length === 0) {
       toast.error("통화 요일을 선택해주세요.");
       return;
     }
@@ -92,11 +85,10 @@ const SeniorProfile = () => {
     setSubmitting(true);
     try {
       await createScheduleChangeRequest({
-        preferredCallTime: newTime,
-        preferredCallDays: newDays,
+        preferredCallTime: selectedTime,
+        preferredCallDays: selectedDays,
       });
       toast.success("변경 요청이 접수되었습니다. 상담사 승인 후 적용됩니다.");
-      setIsDialogOpen(false);
       loadData();
     } catch (error: any) {
       const message = error.response?.data?.message || "변경 요청에 실패했습니다.";
@@ -107,6 +99,12 @@ const SeniorProfile = () => {
   };
 
   const hasPendingRequest = requests.some(r => r.status === "PENDING");
+
+  // 변경 사항이 있는지 확인 (Dirty Checking)
+  const isChanged = schedule ? (
+    selectedTime !== schedule.preferredCallTime ||
+    JSON.stringify(selectedDays.sort()) !== JSON.stringify([...schedule.preferredCallDays].sort())
+  ) : false;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/10 to-background">
@@ -181,81 +179,105 @@ const SeniorProfile = () => {
                   <div>
                     <CardTitle className="text-lg sm:text-xl">통화 스케줄</CardTitle>
                     <CardDescription className="text-base">
-                      정기 통화 일정을 확인하세요
+                      원하는 통화 시간과 요일을 선택하고 변경 요청을 보내세요
                     </CardDescription>
                   </div>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               {loading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
                 </div>
-              ) : schedule ? (
+              ) : error ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-2">스케줄 정보를 불러올 수 없습니다</p>
+                  <p className="text-sm text-red-500 mb-4">{error}</p>
+                  <Button variant="outline" size="sm" onClick={loadData}>
+                    다시 시도
+                  </Button>
+                </div>
+              ) : (
                 <>
-                  <div className="space-y-2">
-                    <Label className="text-base font-medium">스케줄 상태</Label>
-                    <div className="p-4 bg-muted rounded-lg flex items-center gap-2">
-                      {schedule.callScheduleEnabled ? (
-                        <>
-                          <CheckCircle className="w-5 h-5 text-green-600" />
-                          <p className="text-lg text-green-700">활성화됨</p>
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="w-5 h-5 text-gray-400" />
-                          <p className="text-lg text-gray-500">비활성화</p>
-                        </>
-                      )}
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-base font-medium flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        통화 시간
+                      </Label>
+                      <Select value={selectedTime} onValueChange={setSelectedTime}>
+                        <SelectTrigger className="h-14 text-lg">
+                          <SelectValue placeholder="시간 선택" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[300px]">
+                          {[
+                            "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+                            "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
+                            "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00"
+                          ].map((time) => (
+                            <SelectItem key={time} value={time} className="text-lg py-3">
+                              {time}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-base font-medium flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        통화 요일
+                      </Label>
+                      <div className="flex gap-2">
+                        {Object.entries(DAY_LABELS).map(([value, label]) => (
+                          <div
+                            key={value}
+                            onClick={() => {
+                              setSelectedDays(prev =>
+                                prev.includes(value)
+                                  ? prev.filter(d => d !== value)
+                                  : [...prev, value]
+                              );
+                            }}
+                            className={`
+                              flex-1 cursor-pointer rounded-lg h-12 flex items-center justify-center transition-all border
+                              ${selectedDays.includes(value)
+                                ? "bg-primary text-primary-foreground font-bold shadow-md border-primary"
+                                : "bg-background text-muted-foreground hover:bg-muted border-input"}
+                            `}
+                          >
+                            <span className="text-base">{label}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
-                  {schedule.callScheduleEnabled && (
-                    <>
-                      <div className="space-y-2">
-                        <Label className="text-base font-medium flex items-center gap-2">
-                          <Clock className="w-4 h-4" />
-                          통화 시간
-                        </Label>
-                        <div className="p-4 bg-muted rounded-lg">
-                          <p className="text-xl font-bold">{schedule.preferredCallTime || "미설정"}</p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-base font-medium flex items-center gap-2">
-                          <Calendar className="w-4 h-4" />
-                          통화 요일
-                        </Label>
-                        <div className="flex flex-wrap gap-2">
-                          {schedule.preferredCallDays?.length > 0 ? (
-                            schedule.preferredCallDays.map((day) => (
-                              <Badge key={day} className="px-4 py-2 text-base">
-                                {DAY_LABELS[day] || day}
-                              </Badge>
-                            ))
-                          ) : (
-                            <p className="text-muted-foreground">설정된 요일이 없습니다</p>
-                          )}
-                        </div>
-                      </div>
-                    </>
-                  )}
-
                   <Button
-                    onClick={() => setIsDialogOpen(true)}
-                    className="w-full h-14 text-lg"
-                    variant="outline"
-                    disabled={hasPendingRequest}
+                    onClick={handleSubmitRequest}
+                    className="w-full h-14 text-lg font-bold mt-4"
+                    size="lg"
+                    disabled={submitting || hasPendingRequest || selectedDays.length === 0 || !isChanged}
                   >
-                    {hasPendingRequest ? "변경 요청 대기 중..." : "스케줄 변경 요청"}
+                    {submitting ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                        요청 중...
+                      </>
+                    ) : hasPendingRequest ? (
+                      "변경 요청 대기 중..."
+                    ) : (
+                      "스케줄 변경 요청"
+                    )}
                   </Button>
+
+                  {hasPendingRequest && (
+                    <p className="text-sm text-center text-muted-foreground bg-muted/50 p-2 rounded-lg">
+                      * 이미 대기 중인 변경 요청이 있습니다.
+                    </p>
+                  )}
                 </>
-              ) : (
-                <p className="text-center text-muted-foreground py-8">
-                  스케줄 정보를 불러올 수 없습니다
-                </p>
               )}
             </CardContent>
           </Card>
@@ -283,8 +305,8 @@ const SeniorProfile = () => {
                           req.status === "REJECTED" ? "거절됨" : "대기중"}
                       </Badge>
                     </div>
-                    <p className="text-base">
-                      {req.requestedCallTime} / {req.requestedCallDays.map(d => DAY_LABELS[d]).join(", ")}
+                    <p className="text-base font-medium">
+                      {req.requestedCallTime} / {req.requestedCallDays.map(d => DAY_LABELS[d] || d).join(", ")}
                     </p>
                     {req.rejectReason && (
                       <p className="text-sm text-red-600 flex items-center gap-1">
@@ -299,77 +321,6 @@ const SeniorProfile = () => {
           )}
         </div>
       </main>
-
-      {/* Change Request Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-xl">스케줄 변경 요청</DialogTitle>
-            <DialogDescription>
-              원하시는 통화 시간과 요일을 선택해주세요.
-              상담사 승인 후 적용됩니다.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>선호 통화 시간</Label>
-              <Select value={newTime} onValueChange={setNewTime}>
-                <SelectTrigger className="h-12 text-lg">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00"].map((time) => (
-                    <SelectItem key={time} value={time} className="text-lg py-2">
-                      {time}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>선호 통화 요일</Label>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(DAY_LABELS).map(([value, label]) => (
-                  <Badge
-                    key={value}
-                    variant={newDays.includes(value) ? "default" : "outline"}
-                    className="cursor-pointer px-5 py-2 text-base"
-                    onClick={() => {
-                      setNewDays(prev =>
-                        prev.includes(value)
-                          ? prev.filter(d => d !== value)
-                          : [...prev, value]
-                      );
-                    }}
-                  >
-                    {label}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="flex flex-col gap-2 sm:flex-row">
-            <Button
-              variant="outline"
-              onClick={() => setIsDialogOpen(false)}
-              className="h-12 text-lg"
-            >
-              취소
-            </Button>
-            <Button
-              onClick={handleSubmitRequest}
-              disabled={submitting || newDays.length === 0}
-              className="h-12 text-lg"
-            >
-              {submitting ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-              요청하기
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

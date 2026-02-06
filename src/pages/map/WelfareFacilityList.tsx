@@ -97,7 +97,7 @@ export default function WelfareFacilityList() {
             try {
                 // 연결된 어르신 정보 가져오기
                 const elderlyConnection = await getMyElderly();
-                
+
                 if (!elderlyConnection || !elderlyConnection.elderlyId) {
                     setError("연결된 어르신 정보가 없습니다.");
                     setLoading(false);
@@ -121,7 +121,7 @@ export default function WelfareFacilityList() {
                 // 주소를 좌표로 변환
                 if (window.kakao && window.kakao.maps && window.kakao.maps.services) {
                     const geocoder = new window.kakao.maps.services.Geocoder();
-                    
+
                     geocoder.addressSearch(address, (result: any, status: any) => {
                         if (status === window.kakao.maps.services.Status.OK && result.length > 0) {
                             const lat = parseFloat(result[0].y);
@@ -190,8 +190,8 @@ export default function WelfareFacilityList() {
         });
 
         // 현재 위치 인포윈도우
-        const locationLabel = user?.role === 'GUARDIAN' && elderlyInfo 
-            ? `📍 ${elderlyInfo.name}님 댁` 
+        const locationLabel = user?.role === 'GUARDIAN' && elderlyInfo
+            ? `📍 ${elderlyInfo.name}님 댁`
             : '📍 현재 위치';
         const currentInfoWindow = new window.kakao.maps.InfoWindow({
             content: `<div style="padding:5px;font-size:12px;font-weight:bold;">${locationLabel}</div>`
@@ -358,6 +358,11 @@ export default function WelfareFacilityList() {
                                             <div className="flex items-start gap-2 text-gray-600">
                                                 <Clock className="w-4 h-4 mt-0.5 shrink-0" />
                                                 <span>{selectedFacility.operatingHours}</span>
+                                            </div>
+                                        )}
+                                        {selectedFacility.description && (
+                                            <div className="p-3 rounded-lg bg-muted/50 text-gray-600">
+                                                <p className="text-sm">{selectedFacility.description}</p>
                                             </div>
                                         )}
                                         <Button

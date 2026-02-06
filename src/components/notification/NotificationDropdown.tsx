@@ -124,6 +124,11 @@ const NotificationDropdown = ({ role }: NotificationDropdownProps) => {
             return null;
         }
 
+        // [Redirect] Move problematic assignment links to notification history
+        if (role === 'counselor' && linkUrl.startsWith('/counselor/elderly/')) {
+            return '/counselor/notifications';
+        }
+
         // 그 외는 원본 linkUrl 사용
         return linkUrl;
     };

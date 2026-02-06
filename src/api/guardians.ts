@@ -10,6 +10,8 @@ export const signup = async (data: GuardianRequest): Promise<GuardianResponse> =
     return response.data;
 };
 
+export const registerGuardian = signup;
+
 /**
  * 내 정보 조회 (보호자)
  * GET /api/guardians/me
@@ -97,4 +99,5 @@ export default {
     connectElderly,
     getElderlyByGuardianForAdmin,
     getGuardianByElderlyForAdmin,
+    registerGuardian,
 };

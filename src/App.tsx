@@ -11,6 +11,7 @@ import { MaintenanceGuard } from "@/components/layout/MaintenanceGuard";
 import { lazy, Suspense } from "react";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import AIStats from "./pages/admin/AIStats";
+import { EmergencyAlertPopup } from "@/components/alert/EmergencyAlertPopup";
 
 
 const queryClient = new QueryClient();
@@ -77,6 +78,7 @@ const WelfareServiceManagement = lazy(() => import("./pages/admin/WelfareService
 
 const CounselorRegistration = lazy(() => import("./pages/admin/CounselorRegistration"));
 const MyProfile = lazy(() => import("./pages/user/MyProfile"));
+const SettingsPage = lazy(() => import("./pages/user/SettingsPage"));
 
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -104,6 +106,7 @@ const App = () => (
                       {/* Common Protected Routes */}
                       <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
                       <Route path="/notifications" element={<ProtectedRoute><NotificationHistory /></ProtectedRoute>} />
+                      <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
 
                       {/* Guardian Routes - GUARDIAN role only */}
                       <Route path="/guardian" element={<ProtectedRoute allowedRoles={["GUARDIAN"]}><GuardianDashboard /></ProtectedRoute>} />
@@ -172,9 +175,12 @@ const App = () => (
                       <Route path="/senior/profile" element={<ProtectedRoute allowedRoles={["ELDERLY"]}><SeniorProfile /></ProtectedRoute>} />
                       <Route path="/senior/biometric" element={<ProtectedRoute allowedRoles={["ELDERLY"]}><SeniorBiometric /></ProtectedRoute>} />
 
+
+
                       {/* Catch-all for 404 */}
                       <Route path="*" element={<NotFound />} />
                     </Routes>
+                    <EmergencyAlertPopup />
                   </MaintenanceGuard>
                 </Suspense>
               </BrowserRouter>

@@ -138,9 +138,8 @@ const SeniorNotices = () => {
               onClick={() => handleNoticeClick(notice)}
               className="w-full text-left"
             >
-              <Card className={`hover:shadow-lg transition-all active:scale-[0.98] ${
-                notice.isPriority ? 'border-l-4 border-l-red-500 bg-red-50' : ''
-              }`}>
+              <Card className={`hover:shadow-lg transition-all active:scale-[0.98] ${notice.isPriority ? 'border-l-4 border-l-red-500 bg-red-50' : ''
+                }`}>
                 <CardContent className="p-5">
                   <div className="flex items-start gap-4">
                     <div className={`w-14 h-14 rounded-xl ${getCategoryStyle(notice.category)} flex items-center justify-center flex-shrink-0`}>
@@ -160,9 +159,8 @@ const SeniorNotices = () => {
                           <Badge className="bg-primary text-primary-foreground text-sm">NEW</Badge>
                         )}
                       </div>
-                      <p className={`font-bold text-lg line-clamp-2 ${
-                        notice.isPriority ? "text-red-800" : ""
-                      }`}>
+                      <p className={`font-bold text-lg line-clamp-2 ${notice.isPriority ? "text-red-800" : ""
+                        }`}>
                         {notice.isPriority && "📌 "}
                         {notice.title}
                       </p>
@@ -203,7 +201,7 @@ const SeniorNotices = () => {
               {selectedNotice?.content}
             </p>
           </div>
-          
+
           {/* 첨부파일 섹션 */}
           {selectedNotice?.attachments && selectedNotice.attachments.length > 0 && (
             <div className="border-t pt-4">
@@ -212,7 +210,7 @@ const SeniorNotices = () => {
                 {selectedNotice.attachments.map((file, index) => (
                   <a
                     key={index}
-                    href={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}${file.filePath}`}
+                    href={`${(import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080').replace(/\/$/, '')}${file.filePath}`}
                     download={file.originalFileName}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -239,7 +237,7 @@ const SeniorNotices = () => {
               </div>
             </div>
           )}
-          
+
           <DialogFooter className="flex flex-col gap-3 sm:flex-col">
             <Button
               onClick={handleSpeak}

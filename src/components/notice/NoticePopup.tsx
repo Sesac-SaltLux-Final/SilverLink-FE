@@ -20,6 +20,8 @@ interface NoticePopupProps {
   userRole: "GUARDIAN" | "COUNSELOR" | "ELDERLY" | "ADMIN";
 }
 
+const STORAGE_KEY = "noticePopupHideUntil_v2";
+
 export const NoticePopup = ({ userRole }: NoticePopupProps) => {
   const [notices, setNotices] = useState<NoticeResponse[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -30,7 +32,7 @@ export const NoticePopup = ({ userRole }: NoticePopupProps) => {
     const fetchPopupNotices = async () => {
       try {
         // 오늘 하루 보지 않기 체크 확인
-        const hideUntil = localStorage.getItem("noticePopupHideUntil");
+        const hideUntil = localStorage.getItem(STORAGE_KEY);
         if (hideUntil) {
           const hideDate = new Date(hideUntil);
           if (hideDate > new Date()) {
@@ -40,7 +42,7 @@ export const NoticePopup = ({ userRole }: NoticePopupProps) => {
 
         // 팝업 공지사항 조회
         const response = await noticesApi.getPopups();
-        
+
         if (response && response.length > 0) {
           setNotices(response);
           setIsOpen(true);
@@ -72,7 +74,7 @@ export const NoticePopup = ({ userRole }: NoticePopupProps) => {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         tomorrow.setHours(0, 0, 0, 0);
-        localStorage.setItem("noticePopupHideUntil", tomorrow.toISOString());
+        localStorage.setItem(STORAGE_KEY, tomorrow.toISOString());
       }
       setIsOpen(false);
     }
@@ -83,7 +85,7 @@ export const NoticePopup = ({ userRole }: NoticePopupProps) => {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(0, 0, 0, 0);
-      localStorage.setItem("noticePopupHideUntil", tomorrow.toISOString());
+      localStorage.setItem(STORAGE_KEY, tomorrow.toISOString());
     }
     setIsOpen(false);
   };
@@ -136,7 +138,7 @@ export const NoticePopup = ({ userRole }: NoticePopupProps) => {
 
             <div>
               <h3 className="text-lg font-semibold mb-2">{currentNotice.title}</h3>
-              <div 
+              <div
                 className="text-sm text-muted-foreground whitespace-pre-wrap"
                 dangerouslySetInnerHTML={{ __html: currentNotice.content }}
               />
@@ -149,7 +151,7 @@ export const NoticePopup = ({ userRole }: NoticePopupProps) => {
                   {currentNotice.attachments.map((file, index) => (
                     <a
                       key={index}
-                      href={file.fileUrl}
+                      href={file.filePath}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 text-sm text-primary hover:underline"

@@ -39,10 +39,39 @@ export const resetPassword = async (userId: number): Promise<{ tempPassword: str
 
 /**
  * 사용자 삭제 (관리자 전용)
- * DELETE /api/admin/users/{userId}
+ * DELETE /api/admin/members/{userId}
  */
 export const deleteUser = async (userId: number): Promise<void> => {
-    await apiClient.delete(`/api/admin/users/${userId}`);
+    await apiClient.delete(`/api/admin/members/${userId}`);
+};
+
+/**
+ * 회원 수정 요청 타입
+ */
+export interface UpdateMemberRequest {
+    name: string;
+    phone: string;
+    email?: string;
+}
+
+/**
+ * 회원 수정 응답 타입
+ */
+export interface UpdateMemberResponse {
+    userId: number;
+    name: string;
+    phone: string;
+    email?: string;
+    role: string;
+}
+
+/**
+ * 회원 수정 (관리자 전용)
+ * PUT /api/admin/members/{userId}
+ */
+export const updateMember = async (userId: number, data: UpdateMemberRequest): Promise<UpdateMemberResponse> => {
+    const response = await apiClient.put<{ data: UpdateMemberResponse }>(`/api/admin/members/${userId}`, data);
+    return response.data.data;
 };
 
 export default {
@@ -51,5 +80,5 @@ export default {
     changeUserStatus,
     resetPassword,
     deleteUser,
+    updateMember,
 };
-

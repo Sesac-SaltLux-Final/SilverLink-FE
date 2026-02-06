@@ -81,14 +81,6 @@ const SeniorDashboard = () => {
       action: () => navigate("/senior/biometric"),
     },
     {
-      id: "call",
-      title: "전화하기",
-      description: "상담사에게 전화합니다",
-      icon: <Phone className="w-12 h-12" />,
-      color: "bg-primary",
-      action: () => navigate("/senior/call"),
-    },
-    {
       id: "facilities",
       title: "주변 시설",
       description: "가까운 복지시설을 찾아요",
