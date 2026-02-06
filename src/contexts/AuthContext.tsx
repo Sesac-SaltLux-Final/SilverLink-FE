@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import apiClient, { setAccessToken } from '@/api/index';
 import { logout as apiLogout, refresh } from '@/api/auth';
 import { getMyProfile } from '@/api/users';
@@ -32,6 +32,54 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    // 자동 토큰 갱신 함수
+    const autoRefreshToken = useCallback(async () => {
+        try {
+            console.log('[AutoRefresh] 토큰 자동 갱신 시도...');
+            // @ts-ignore
+            const response = await apiClient.post('/api/auth/refresh', null, { _skipGlobalErrorHandler: true });
+            const { accessToken } = response.data;
+            setAccessToken(accessToken);
+            console.log('[AutoRefresh] 토큰 갱신 성공');
+        } catch (error) {
+            console.error('[AutoRefresh] 토큰 갱신 실패:', error);
+            // 갱신 실패 시 로그아웃 처리
+            setAccessToken(null);
+            setUser(null);
+            setIsLoggedIn(false);
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('user');
+            
+            if (refreshIntervalRef.current) {
+                clearInterval(refreshIntervalRef.current);
+                refreshIntervalRef.current = null;
+            }
+        }
+    }, []);
+
+    // 자동 갱신 타이머 시작
+    const startAutoRefresh = useCallback(() => {
+        // 기존 타이머가 있으면 제거
+        if (refreshIntervalRef.current) {
+            clearInterval(refreshIntervalRef.current);
+        }
+
+        // 10분마다 토큰 갱신 (Access Token TTL이 15분이므로 10분마다 갱신)
+        const REFRESH_INTERVAL = 10 * 60 * 1000; // 10분
+        refreshIntervalRef.current = setInterval(autoRefreshToken, REFRESH_INTERVAL);
+        console.log('[AutoRefresh] 자동 갱신 타이머 시작 (10분 주기)');
+    }, [autoRefreshToken]);
+
+    // 자동 갱신 타이머 중지
+    const stopAutoRefresh = useCallback(() => {
+        if (refreshIntervalRef.current) {
+            clearInterval(refreshIntervalRef.current);
+            refreshIntervalRef.current = null;
+            console.log('[AutoRefresh] 자동 갱신 타이머 중지');
+        }
+    }, []);
 
     // 초기화: 쿠키 또는 localStorage를 통한 세션 복원
     useEffect(() => {
@@ -52,6 +100,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 // 3. 상태 업데이트
                 setUser(userProfile);
                 setIsLoggedIn(true);
+                
+                // 4. 자동 갱신 시작
+                startAutoRefresh();
             } catch (error) {
                 // 쿠키 인증 실패 시 localStorage 확인 (백업)
                 const storedToken = localStorage.getItem('accessToken');
@@ -68,6 +119,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
                         setUser(userProfile);
                         setIsLoggedIn(true);
+                        
+                        // 자동 갱신 시작
+                        startAutoRefresh();
                     } catch (e) {
                         // 토큰이 만료되었거나 유효하지 않음 -> 초기화
                         console.warn("Stored session is invalid:", e);
@@ -87,7 +141,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         };
 
         initSession();
-    }, []);
+        
+        // 컴포넌트 언마운트 시 타이머 정리
+        return () => {
+            stopAutoRefresh();
+        };
+    }, [startAutoRefresh, stopAutoRefresh]);
 
     // 로그인 처리
     const login = useCallback((accessToken: string, userData: User) => {
@@ -99,7 +158,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
         setUser(userData);
         setIsLoggedIn(true);
-    }, []);
+        
+        // 자동 갱신 시작
+        startAutoRefresh();
+    }, [startAutoRefresh]);
 
     // 로그아웃 처리
     const logout = useCallback(async () => {
@@ -108,6 +170,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         } catch (error) {
             console.error('Logout API error:', error);
         } finally {
+            // 자동 갱신 중지
+            stopAutoRefresh();
+            
             setAccessToken(null); // 메모리 토큰 삭제
             setUser(null);
             setIsLoggedIn(false);
@@ -116,7 +181,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             localStorage.removeItem('accessToken');
             localStorage.removeItem('user');
         }
-    }, []);
+    }, [stopAutoRefresh]);
 
     const value: AuthContextType = {
         isLoggedIn,

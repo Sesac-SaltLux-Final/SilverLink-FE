@@ -110,8 +110,12 @@ const CallTest = () => {
       return;
     }
 
-    // SSE 연결
-    const eventSource = new EventSource(`/api/internal/callbot/calls/${activeCallId}/sse`);
+    // SSE 연결 - CloudFront 우회하고 ALB로 직접 연결
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+    const sseUrl = `${apiBaseUrl}/api/internal/callbot/calls/${activeCallId}/sse`;
+    console.log(`🔌 [SSE] 연결 시도: ${sseUrl}`);
+    
+    const eventSource = new EventSource(sseUrl);
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {

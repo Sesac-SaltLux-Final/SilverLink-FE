@@ -113,7 +113,6 @@ const CounselorRecords = () => {
       content: "",
       result: "",
       followUp: "",
-      followUp: "",
       status: "COMPLETED",
       duration: "10",
     });
