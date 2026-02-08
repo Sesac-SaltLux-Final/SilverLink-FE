@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Heart,
   Activity,
@@ -12,7 +12,8 @@ import {
   MessageSquare,
   FileText,
   HelpCircle,
-  Loader2
+  Loader2,
+  Radio
 } from "lucide-react";
 import { guardianNavItems } from "@/config/guardianNavItems";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -126,87 +127,110 @@ const GuardianDashboard = () => {
   // Chart Data
   const [chartData, setChartData] = useState<any[]>([]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
+  // 데이터 조회 함수 (showLoading: 로딩 표시 여부)
+  const fetchData = useCallback(async (showLoading = true) => {
+    try {
+      if (showLoading) setIsLoading(true);
 
-        // 사용자 프로필 및 어르신 정보 조회
-        const [profile, elderlyResponse] = await Promise.all([
-          usersApi.getMyProfile(),
-          guardiansApi.getMyElderly()
-        ]);
+      // 사용자 프로필 및 어르신 정보 조회
+      const [profile, elderlyResponse] = await Promise.all([
+        usersApi.getMyProfile(),
+        guardiansApi.getMyElderly()
+      ]);
 
-        setUserProfile(profile);
-        setElderlyData(elderlyResponse);
+      setUserProfile(profile);
+      setElderlyData(elderlyResponse);
 
-        if (elderlyResponse) {
-          const elderlyId = elderlyResponse.elderlyId;
-          // 통계 및 차트를 위해 넉넉하게 최근 20건 조회
-          const callsResponse = await callReviewsApi.getCallReviewsForGuardian(elderlyId); // Assuming default page size is enough or use pagination?
-          const calls = callsResponse.content;
+      if (elderlyResponse) {
+        const elderlyId = elderlyResponse.elderlyId;
+        // 통계 및 차트를 위해 넉넉하게 최근 20건 조회
+        const callsResponse = await callReviewsApi.getCallReviewsForGuardian(elderlyId);
+        const calls = callsResponse.content;
 
-          setRecentCalls(calls.slice(0, 5)); // 최근 5건 표시
+        setRecentCalls(calls.slice(0, 5)); // 최근 5건 표시
 
-          // 1. Calculate Stats
-          let totalSeconds = 0;
-          let validDurationCount = 0;
+        // 1. Calculate Stats
+        let totalSeconds = 0;
+        let validDurationCount = 0;
 
-          calls.forEach(call => {
-            const secs = parseDurationToSeconds(call.duration);
-            if (secs > 0) {
-              totalSeconds += secs;
-              validDurationCount++;
-            }
-          });
-
-          const avgDurationStr = validDurationCount > 0
-            ? formatSecondsToDuration(totalSeconds / validDurationCount)
-            : "0분 0초";
-
-          // Sleep Status from latest call
-          const latestCall = calls[0];
-          let sleepStatusStr = "미확인";
-          let sleepDetailStr = "-";
-
-          if (latestCall?.dailyStatus?.sleep) {
-            sleepStatusStr = latestCall.dailyStatus.sleep.levelKorean || "미확인";
-            sleepDetailStr = latestCall.dailyStatus.sleep.detail || "-";
+        calls.forEach(call => {
+          const secs = parseDurationToSeconds(call.duration);
+          if (secs > 0) {
+            totalSeconds += secs;
+            validDurationCount++;
           }
+        });
 
-          setStats({
-            avgDuration: avgDurationStr,
-            totalCalls: callsResponse.totalElements || calls.length,
-            sleepStatus: sleepStatusStr,
-            sleepDetail: sleepDetailStr
-          });
+        const avgDurationStr = validDurationCount > 0
+          ? formatSecondsToDuration(totalSeconds / validDurationCount)
+          : "0분 0초";
 
-          // 2. Process Chart Data (Emotion Trend)
-          // Reverse to show chronological order (oldest to newest)
-          const trendData = [...calls].reverse().map(call => {
-            let score = 2; // Default NEUTRAL
-            if (call.emotionLevel === 'GOOD') score = 3;
-            if (call.emotionLevel === 'BAD') score = 1;
+        // Sleep Status from latest call
+        const latestCall = calls[0];
+        let sleepStatusStr = "미확인";
+        let sleepDetailStr = "-";
 
-            return {
-              date: call.callAt.split('T')[0].substring(5), // MM-DD
-              score: score,
-              emotion: call.emotionLevelKorean || '보통',
-              fullDate: call.callAt.split('T')[0]
-            };
-          });
-          setChartData(trendData);
+        if (latestCall?.dailyStatus?.sleep) {
+          sleepStatusStr = latestCall.dailyStatus.sleep.levelKorean || "미확인";
+          sleepDetailStr = latestCall.dailyStatus.sleep.detail || "-";
         }
 
-      } catch (error) {
-        console.error('Failed to fetch dashboard data:', error);
-      } finally {
-        setIsLoading(false);
+        setStats({
+          avgDuration: avgDurationStr,
+          totalCalls: callsResponse.totalElements || calls.length,
+          sleepStatus: sleepStatusStr,
+          sleepDetail: sleepDetailStr
+        });
+
+        // 2. Process Chart Data (Emotion Trend)
+        // Reverse to show chronological order (oldest to newest)
+        const trendData = [...calls].reverse().map(call => {
+          let score = 2; // Default NEUTRAL
+          if (call.emotionLevel === 'GOOD') score = 3;
+          if (call.emotionLevel === 'BAD') score = 1;
+
+          return {
+            date: call.callAt.split('T')[0].substring(5), // MM-DD
+            score: score,
+            emotion: call.emotionLevelKorean || '보통',
+            fullDate: call.callAt.split('T')[0]
+          };
+        });
+        setChartData(trendData);
+      }
+
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
+    } finally {
+      if (showLoading) setIsLoading(false);
+    }
+  }, []);
+
+  // 최초 로딩
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // 10초마다 자동 갱신 (통화 시작/종료 실시간 반영)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchData(false);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  // 페이지가 다시 보일 때 데이터 새로고침
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchData(false);
       }
     };
-
-    fetchData();
-  }, []);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchData]);
 
   if (isLoading) {
     return (
@@ -454,11 +478,19 @@ const GuardianDashboard = () => {
                         onClick={() => navigate(`/guardian/calls/${call.callId}`)}
                       >
                         <TableCell>
-                          <div>
-                            <p>{call.callAt?.split('T')[0]}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatTimeAMPM(call.callAt)}
-                            </p>
+                          <div className="flex items-center gap-2">
+                            <div>
+                              <p>{call.callAt?.split('T')[0]}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatTimeAMPM(call.callAt)}
+                              </p>
+                            </div>
+                            {call.state === 'ANSWERED' && (
+                              <Badge variant="outline" className="animate-pulse text-green-600 border-green-600 text-xs px-1.5 py-0">
+                                <Radio className="w-3 h-3 mr-1" />
+                                통화 중
+                              </Badge>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>{call.duration}</TableCell>

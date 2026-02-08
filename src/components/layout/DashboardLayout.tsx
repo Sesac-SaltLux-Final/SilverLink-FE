@@ -34,6 +34,7 @@ import ChatbotWidget from "@/components/chatbot/ChatbotWidget";
 import NotificationDropdown from "@/components/notification/NotificationDropdown";
 import accessRequestsApi from "@/api/accessRequests";
 import { EmergencyAlertPopup } from "@/components/alert/EmergencyAlertPopup";
+import NotificationToastListener from "@/components/notification/NotificationToastListener";
 
 interface NavItem {
   title: string;
@@ -280,6 +281,7 @@ const DashboardLayout = ({
         </main>
       </div>
       <ChatbotWidget />
+      <NotificationToastListener />
     </div>
   );
 };

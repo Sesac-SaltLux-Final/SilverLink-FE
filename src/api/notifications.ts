@@ -14,6 +14,8 @@ export type NotificationType =
     | 'ACCESS_REJECTED'       // 접근권한 거부
     | 'ASSIGNMENT'            // 담당자 배정
     | 'NOTICE'                // 공지사항
+    | 'COUNSELOR_COMMENT'     // 상담사 코멘트
+    | 'EMERGENCY_NEW'         // 긴급 알림 (새로 추가)
     | 'SYSTEM';               // 시스템 알림
 
 // 알림 요약 응답 (목록용)
@@ -23,6 +25,7 @@ export interface NotificationSummary {
     notificationTypeText: string;
     title: string;
     content: string;
+    referenceId?: number;     // 중복 체크용
     linkUrl?: string;
     isRead: boolean;
     createdAt: string;

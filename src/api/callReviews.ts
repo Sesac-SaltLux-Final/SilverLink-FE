@@ -80,6 +80,17 @@ export const getUnreviewedCount = async (): Promise<UnreviewedCountResponse> => 
     return response.data.data;
 };
 
+/**
+ * 오늘의 통화 건수 조회 (상담사)
+ * GET /api/call-reviews/counselor/today-count
+ */
+export const getTodayCallCount = async (): Promise<number> => {
+    const response = await apiClient.get<ApiResponse<number>>(
+        '/api/call-reviews/counselor/today-count'
+    );
+    return response.data.data;
+};
+
 // ===== 보호자용 API =====
 
 /**
@@ -117,6 +128,7 @@ export default {
     createReview,
     updateReview,
     getUnreviewedCount,
+    getTodayCallCount,
     // 보호자용
     getCallReviewsForGuardian,
     getCallDetailForGuardian,

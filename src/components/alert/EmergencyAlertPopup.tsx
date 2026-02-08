@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import emergencyAlertsApi, { RecipientAlertResponse, Severity } from "@/api/emergencyAlerts";
-import { EventSourcePolyfill } from 'event-source-polyfill';
 
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -98,9 +97,52 @@ export const EmergencyAlertPopup = () => {
 
         connect();
 
+        // 전역 긴급 알림 이벤트 수신 (NotificationToastListener에서 디스패치)
+        const handleEmergencyAlert = (e: Event) => {
+            const customEvent = e as CustomEvent;
+            console.log("🚨 [EmergencyAlertPopup] 긴급 알림 이벤트 수신:", customEvent.detail);
+
+            // 1. 서버에서 최신 목록 조회 시도 (데이터 정합성 보장)
+            fetchAlerts().then(() => {
+                // 2. 만약 조회가 안되거나 지연될 경우, 이벤트로 넘어온 데이터로 즉시 표시 (Fallback)
+                const detail = customEvent.detail;
+                if (detail && detail.alertId) {
+                    // 이미 표시된 알림인지 확인
+                    setAlerts(prev => {
+                        if (prev.some(a => a.alertId === detail.alertId)) return prev;
+
+                        console.log("⚠️ [EmergencyAlertPopup] 목록 조회 후에도 없거나 지연됨 -> 직접 데이터 표시", detail);
+
+                        // DTO 매핑 (RealtimeResponse -> RecipientAlertResponse)
+                        // 리얼타임 응답에는 isRead 정보가 없으므로 기본값 false 설정
+                        const fallbackAlert: RecipientAlertResponse = {
+                            alertId: detail.alertId,
+                            severity: detail.severity || "CRITICAL",
+                            severityText: detail.severity === "CRITICAL" ? "심각" : "주의", // 텍스트 매핑 필요시 수정
+                            alertType: detail.alertType || "HEALTH",
+                            alertTypeText: "긴급 상황", // 상세 텍스트는 API 응답에 의존하거나 매핑
+                            title: detail.title || "긴급 상황",
+                            elderlyName: detail.elderlyName || "알 수 없음",
+                            elderlyAge: detail.elderlyAge || 0,
+                            timeAgo: detail.timeAgo || "방금 전",
+                            createdAt: detail.createdAt || new Date().toISOString(),
+                            isRead: false,
+                        };
+
+                        return [fallbackAlert, ...prev];
+                    });
+                    setIsOpen(true);
+                }
+            });
+        };
+
+        window.addEventListener('silverlink:emergency-alert-received', handleEmergencyAlert);
+
+        // 기존 동기화 이벤트도 유지 (필요하다면)
+        // window.addEventListener('emergency-alert-sync', handleSync); 
+
         return () => {
-            eventSource?.close();
-            if (reconnectTimer) clearTimeout(reconnectTimer);
+            window.removeEventListener('silverlink:emergency-alert-received', handleEmergencyAlert);
         };
     }, [fetchAlerts, user]);
 
@@ -140,7 +182,7 @@ export const EmergencyAlertPopup = () => {
                 navigate("/admin/dashboard");
                 break;
             case "GUARDIAN":
-                navigate("/guardian/calls");
+                navigate("/guardian/alerts");
                 break;
         }
     };

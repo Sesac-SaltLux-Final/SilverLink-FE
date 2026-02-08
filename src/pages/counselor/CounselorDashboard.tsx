@@ -82,33 +82,75 @@ const CounselorDashboard = () => {
     try {
       if (showLoading) setIsLoading(true);
 
-      // 1. 상담사 정보 조회
-      const counselor = await counselorsApi.getMyInfo();
-      setCounselorInfo(counselor);
+      // 병렬 요청으로 성능 최적화 및 에러 격리
+      const [
+        counselorResult,
+        callsResult,
+        unreviewedResult,
+        alertsResult,
+        todayCountResult
+      ] = await Promise.allSettled([
+        counselorsApi.getMyInfo(),
+        callReviewsApi.getCallRecordsForCounselor({ size: 10 }),
+        callReviewsApi.getUnreviewedCount(),
+        emergencyAlertsApi.getPendingAlertsForCounselor(),
+        callReviewsApi.getTodayCallCount()
+      ]);
 
-      // 2. 통화 기록 조회 (최근 10건)
-      const callsResponse = await callReviewsApi.getCallRecordsForCounselor({ size: 10 });
-      setCallRecords(callsResponse.content);
+      // 1. 상담사 정보
+      let counselor = null;
+      if (counselorResult.status === 'fulfilled') {
+        counselor = counselorResult.value;
+        setCounselorInfo(counselor);
+      } else {
+        console.error("Failed to fetch counselor info", counselorResult.reason);
+      }
+
+      // 2. 통화 기록
+      let recentCalls: CallRecordSummaryResponse[] = [];
+      if (callsResult.status === 'fulfilled') {
+        recentCalls = callsResult.value.content;
+        setCallRecords(recentCalls);
+      } else {
+        console.error("Failed to fetch call records", callsResult.reason);
+      }
 
       // 3. 미확인 통화 건수
-      const unreviewedResponse = await callReviewsApi.getUnreviewedCount();
+      let unreviewedCount = 0;
+      if (unreviewedResult.status === 'fulfilled') {
+        unreviewedCount = unreviewedResult.value.unreviewedCount;
+      } else {
+        console.error("Failed to fetch unreviewed count", unreviewedResult.reason);
+      }
 
-      // 4. 긴급 알림 (미처리) 조회
-      const pendingAlerts = await emergencyAlertsApi.getPendingAlertsForCounselor();
-      setRealUrgentAlerts(pendingAlerts);
+      // 4. 긴급 알림
+      let urgentAlerts: EmergencyAlertSummary[] = [];
+      if (alertsResult.status === 'fulfilled') {
+        urgentAlerts = alertsResult.value;
+        setRealUrgentAlerts(urgentAlerts);
+      } else {
+        console.error("Failed to fetch alerts", alertsResult.reason);
+      }
 
-      // 5. 오늘 통화 수 계산 (날짜 필터)
-      const today = new Date().toISOString().split('T')[0];
-      const todayCallsCount = callsResponse.content.filter(
-        (c) => c.callAt?.startsWith(today)
-      ).length;
+      // 5. 오늘 통화 수
+      let todayCalls = 0;
+      if (todayCountResult.status === 'fulfilled') {
+        todayCalls = todayCountResult.value;
+      } else {
+        // 실패 시 (백엔드 미반영 등) 기존 로직으로 Fallback 시도
+        console.warn("Failed to fetch today call count (using fallback)", todayCountResult.reason);
+        if (recentCalls.length > 0) {
+          const today = new Date().toISOString().split('T')[0];
+          todayCalls = recentCalls.filter((c) => c.callAt?.startsWith(today)).length;
+        }
+      }
 
       // 6. 통계 설정
       setStats({
-        totalSeniors: counselor.assignedElderlyCount || 0,
-        todayCalls: todayCallsCount,
-        pendingReviews: unreviewedResponse.count,
-        urgentAlerts: pendingAlerts.length,
+        totalSeniors: counselor?.assignedElderlyCount || 0,
+        todayCalls: todayCalls,
+        pendingReviews: unreviewedCount,
+        urgentAlerts: urgentAlerts.length,
       });
 
     } catch (error) {

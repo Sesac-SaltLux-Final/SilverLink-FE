@@ -475,10 +475,13 @@ export interface GuardianCallReviewResponse {
         dangerReason?: string;
     }>;
     dailyStatus?: DailyStatusInfo;
+    recordingUrl?: string;
+    isAccessGranted?: boolean;
 }
 
 export interface UnreviewedCountResponse {
-    count: number;
+    unreviewedCount: number;
+    totalCount: number;
 }
 
 // =====================

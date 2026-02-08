@@ -32,6 +32,7 @@ import {
     markAllAsRead as markAllNotificationAsRead,
     NotificationSummary
 } from "@/api/notifications";
+import { mapLinkUrl } from "@/utils/notificationUtils";
 
 const NotificationHistory = () => {
     const navigate = useNavigate();
@@ -87,7 +88,12 @@ const NotificationHistory = () => {
 
     const allItems = [
         ...emergencyAlerts.map(a => ({ ...a, type: 'emergency', date: new Date(a.createdAt) })),
-        ...notifications.map(n => ({ ...n, type: 'normal', date: new Date(n.createdAt) }))
+        ...notifications.filter(n => {
+            if (n.notificationType === 'EMERGENCY_NEW') {
+                return !emergencyAlerts.some(a => a.alertId === n.referenceId);
+            }
+            return true;
+        }).map(n => ({ ...n, type: 'normal', date: new Date(n.createdAt) }))
     ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
     const filteredItems = activeTab === "all"
@@ -139,16 +145,26 @@ const NotificationHistory = () => {
                                         {filteredItems.map((item: any) => (
                                             <div
                                                 key={`${item.type}-${item.type === 'emergency' ? item.alertId : item.notificationId}`}
-                                                className={`p-4 hover:bg-muted/30 transition-colors flex gap-4 ${!item.isRead ? 'bg-primary/5' : ''}`}
+                                                className={`p-4 hover:bg-muted/30 transition-colors flex gap-4 cursor-pointer ${!item.isRead ? 'bg-primary/5' : ''}`}
+                                                onClick={() => {
+                                                    const targetUrl = mapLinkUrl(item.linkUrl, role);
+                                                    if (targetUrl) navigate(targetUrl);
+                                                }}
                                             >
-                                                <div className={`mt-1 w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${item.type === 'emergency' ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'
+                                                <div className={`mt-1 w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${item.type === 'emergency' || item.notificationType === 'EMERGENCY_NEW'
+                                                    ? 'bg-destructive/10 text-destructive'
+                                                    : 'bg-primary/10 text-primary'
                                                     }`}>
-                                                    {item.type === 'emergency' ? <AlertTriangle className="w-5 h-5" /> : <MessageSquare className="w-5 h-5" />}
+                                                    {item.type === 'emergency' || item.notificationType === 'EMERGENCY_NEW'
+                                                        ? <AlertTriangle className="w-5 h-5" />
+                                                        : <MessageSquare className="w-5 h-5" />}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1">
                                                         {item.type === 'emergency' ? (
                                                             <Badge className={getSeverityColor(item.severity)}>{item.severityText}</Badge>
+                                                        ) : item.notificationType === 'EMERGENCY_NEW' ? (
+                                                            <Badge className="bg-destructive text-destructive-foreground">긴급</Badge>
                                                         ) : (
                                                             <Badge variant="outline">{item.notificationTypeText}</Badge>
                                                         )}
@@ -156,11 +172,15 @@ const NotificationHistory = () => {
                                                         {!item.isRead && <span className="w-2 h-2 bg-primary rounded-full" />}
                                                     </div>
                                                     <p className="text-sm text-muted-foreground mb-1">
-                                                        {item.type === 'emergency' ? `${item.elderlyName} (${item.elderlyAge}세)` : item.content}
+                                                        {item.type === 'emergency'
+                                                            ? `${item.elderlyName} (${item.elderlyAge}세)`
+                                                            : item.notificationType === 'EMERGENCY_NEW'
+                                                                ? item.content // EMERGENCY_NEW contents are pre-formatted
+                                                                : item.content}
                                                     </p>
                                                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                                         <Clock className="w-3 h-3" />
-                                                        {item.date.toLocaleString()} ({item.timeAgo})
+                                                        {new Date(item.date).toLocaleString()} ({item.timeAgo})
                                                     </div>
                                                 </div>
                                             </div>

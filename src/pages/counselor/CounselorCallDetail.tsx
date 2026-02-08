@@ -186,6 +186,8 @@ const CounselorCallDetail = () => {
     return () => clearInterval(interval);
   }, [isCallActive, id]);
 
+  const [retryCount, setRetryCount] = useState(0);
+
   // SSE 연결은 isCallActive에 연동 (모니터링 중지해도 SSE는 유지)
   useEffect(() => {
     if (!id || !isCallActive) {
@@ -198,28 +200,31 @@ const CounselorCallDetail = () => {
     }
 
     // 기존 대화 내용(prompts + responses)을 모니터링 초기 메시지로 설정
-    const initialMessages: LiveMessage[] = [
-      ...(callDetail?.prompts || []).map(p => ({
-        id: p.promptId,
-        type: 'PROMPT' as const,
-        content: p.content,
-        timestamp: new Date(p.createdAt)
-      })),
-      ...(callDetail?.responses || []).map(r => ({
-        id: r.responseId,
-        type: 'REPLY' as const,
-        content: r.content,
-        timestamp: new Date(r.respondedAt)
-      }))
-    ].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-    setLiveMessages(initialMessages);
+    // 재연결 시에는 초기화하지 않음 (중복 방지 및 기존 대화 유지)
+    if (liveMessages.length === 0) {
+      const initialMessages: LiveMessage[] = [
+        ...(callDetail?.prompts || []).map(p => ({
+          id: p.promptId,
+          type: 'PROMPT' as const,
+          content: p.content,
+          timestamp: new Date(p.createdAt)
+        })),
+        ...(callDetail?.responses || []).map(r => ({
+          id: r.responseId,
+          type: 'REPLY' as const,
+          content: r.content,
+          timestamp: new Date(r.respondedAt)
+        }))
+      ].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+      setLiveMessages(initialMessages);
+    }
 
     // SSE 연결
     const eventSource = new EventSource(`/api/internal/callbot/calls/${id}/sse`);
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
-      console.log(`✅ [SSE] 연결 성공: callId=${id}, readyState=${eventSource.readyState}`);
+      console.log(`✅ [SSE] 연결 성공: callId=${id} (Retry: ${retryCount})`);
       setSseConnected(true);
     };
 
@@ -249,6 +254,18 @@ const CounselorCallDetail = () => {
       setLiveMessages(prev => [...prev, newLog]);
     });
 
+    eventSource.addEventListener('emergency', (e: MessageEvent) => {
+      console.log(`🚨 [SSE] 긴급 알림 수신: callId=${id}`, e.data);
+
+      // 1. 글로벌 알림 팝업에게 "새 알림이 있다"고 알림 (커스텀 이벤트)
+      window.dispatchEvent(new CustomEvent('emergency-alert-sync'));
+
+      // 2. 혹은 직접 토스트 표시 (백업용)
+      // alert("🚨 [긴급] 위험 상황이 감지되었습니다! 통화 내용을 확인해주세요."); // 너무 침해적이어서 제거
+
+      fetchCallDetail(false);
+    });
+
     eventSource.addEventListener('callEnded', () => {
       console.log('Call ended via SSE');
       eventSource.close();
@@ -260,7 +277,16 @@ const CounselorCallDetail = () => {
       console.error(`❌ [SSE] 에러 발생: callId=${id}, readyState=${eventSource.readyState}`, e);
       setSseConnected(false);
       eventSource.close();
-      setTimeout(() => fetchCallDetail(false), 2000);
+
+      // 재연결 시도 (3초 후)
+      if (isCallActive) {
+        console.log(`🔄 [SSE] 3초 후 재연결 시도... (Current Retry: ${retryCount})`);
+        setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+        }, 3000);
+      } else {
+        setTimeout(() => fetchCallDetail(false), 2000);
+      }
     };
 
     return () => {
@@ -268,7 +294,7 @@ const CounselorCallDetail = () => {
       eventSource.close();
       setSseConnected(false);
     };
-  }, [id, isCallActive]);
+  }, [id, isCallActive, retryCount]);
 
   // 모니터링 카드 내부에서만 자동 스크롤 (페이지 스크롤에 영향 없음)
   useEffect(() => {
@@ -719,56 +745,7 @@ const CounselorCallDetail = () => {
               </CardContent>
             </Card>
 
-            {/* AI Analysis */}
-            <Card className="shadow-card border-0">
-              <CardHeader>
-                <CardTitle className="text-lg">AI 분석 결과</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">감정 상태</p>
-                  <Badge
-                    className={
-                      emotion === 'POSITIVE' || emotion === 'good'
-                        ? 'bg-success/10 text-success'
-                        : emotion === 'NEGATIVE' || emotion === 'bad'
-                          ? 'bg-destructive/10 text-destructive'
-                          : 'bg-warning/10 text-warning'
-                    }
-                  >
-                    {emotion === 'POSITIVE' || emotion === 'good' ? '긍정적' :
-                      emotion === 'NEGATIVE' || emotion === 'bad' ? '부정적' : '중립'}
-                  </Badge>
-                </div>
 
-                <Separator />
-
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">위험도</p>
-                  <Badge
-                    className={
-                      hasRisk
-                        ? 'bg-destructive/10 text-destructive'
-                        : 'bg-success/10 text-success'
-                    }
-                  >
-                    {hasRisk ? '위험 응답 감지' : '정상'}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Quick Actions */}
-            <div className="space-y-2">
-              <Button variant="outline" className="w-full justify-start">
-                <MessageSquare className="w-4 h-4 mr-3" />
-                보호자에게 알림 전송
-              </Button>
-              <Button variant="outline" className="w-full justify-start">
-                <AlertTriangle className="w-4 h-4 mr-3" />
-                긴급 케이스 등록
-              </Button>
-            </div>
           </div>
         </div>
       </div>
