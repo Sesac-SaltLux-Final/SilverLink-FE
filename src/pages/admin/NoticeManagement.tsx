@@ -56,11 +56,9 @@ interface Notice {
 
 const NoticeManagement = () => {
   const { user } = useAuth();
-  
-  // 디버깅용 로그
-  console.log("=== NoticeManagement 렌더링 ===");
-  console.log("user:", user);
-  
+
+
+
   const [notices, setNotices] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -125,7 +123,7 @@ const NoticeManagement = () => {
     ];
 
     const allowedFiles = Array.from(files).filter(file => allowedTypes.includes(file.type));
-    
+
     if (allowedFiles.length === 0) {
       toast.error("지원하지 않는 파일 형식입니다. PDF, Word, Excel, 이미지 파일만 업로드 가능합니다.");
       return;
@@ -145,10 +143,8 @@ const NoticeManagement = () => {
 
     try {
       setFileUploading(true);
-      console.log("=== 파일 업로드 시작 ===");
-      console.log("업로드할 파일 수:", allowedFiles.length);
 
-      const uploadPromises = allowedFiles.map(file => 
+      const uploadPromises = allowedFiles.map(file =>
         filesApi.uploadFile(file, 'notices')
       );
 
@@ -157,7 +153,6 @@ const NoticeManagement = () => {
       setUploadedFiles(prev => [...prev, ...uploadResults]);
       toast.success(`${uploadResults.length}개의 파일이 업로드되었습니다.`);
     } catch (error: any) {
-      console.error("파일 업로드 실패:", error);
       const errorMessage = error.response?.data?.message || error.message || "파일 업로드에 실패했습니다.";
       toast.error(`파일 업로드 실패: ${errorMessage}`);
     } finally {
@@ -180,7 +175,6 @@ const NoticeManagement = () => {
       setUploadedFiles(prev => prev.filter((_, index) => index !== fileIndex));
       toast.success("파일이 삭제되었습니다.");
     } catch (error: any) {
-      console.error("파일 삭제 실패:", error);
       const errorMessage = error.response?.data?.message || error.message || "파일 삭제에 실패했습니다.";
       toast.error(`파일 삭제 실패: ${errorMessage}`);
     }
@@ -190,7 +184,7 @@ const NoticeManagement = () => {
   const fetchNotices = async () => {
     try {
       setLoading(true);
-      
+
       const response = await noticesApi.getAdminNotices({
         keyword: searchTerm || undefined,
         size: 100
@@ -198,7 +192,7 @@ const NoticeManagement = () => {
 
       // API 응답을 Notice 형식으로 변환
       const mappedNotices: Notice[] = (response.content || []).map((n: NoticeResponse) => {
-        
+
         // 백엔드 카테고리를 프론트엔드 카테고리로 매핑
         let frontendCategory = '공지';
         if (n.category === 'NOTICE') {
@@ -236,7 +230,7 @@ const NoticeManagement = () => {
           readCount: n.readCount || 0, // 백엔드에서 제공하는 실제 데이터 사용
           totalTargetCount: n.totalTargetCount || 0, // 백엔드에서 제공하는 실제 데이터 사용
         };
-        
+
         return mappedNotice;
       });
 
@@ -244,19 +238,19 @@ const NoticeManagement = () => {
     } catch (error: any) {
       console.error("공지사항 로드 실패:", error);
       console.error("오류 상세:", error.response?.data || error.message);
-      
+
       // 인증 오류인 경우 특별 처리
       if (error.response?.status === 401) {
         toast.error("로그인이 필요합니다. 다시 로그인해주세요.");
         return;
       }
-      
+
       // 서버 연결 오류인 경우
       if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
         toast.error("서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인해주세요.");
         return;
       }
-      
+
       const errorMessage = error.response?.data?.message || error.message || "알 수 없는 오류가 발생했습니다.";
       toast.error(`공지사항을 불러오는데 실패했습니다: ${errorMessage}`);
     } finally {
@@ -294,7 +288,7 @@ const NoticeManagement = () => {
   const handleEdit = async (notice: Notice) => {
     setIsEditMode(true);
     setSelectedNotice(notice);
-    
+
     // targetRoles 배열을 백엔드 형식으로 변환 (관리자 제외)
     const backendRoles = notice.targetRoles
       .filter(role => role !== "전체" && role !== "관리자") // 관리자 제외
@@ -307,7 +301,7 @@ const NoticeManagement = () => {
         }
       })
       .filter(role => role !== '');
-    
+
     setFormData({
       title: notice.title,
       content: notice.content,
@@ -318,12 +312,12 @@ const NoticeManagement = () => {
       isPopup: false, // 기본값으로 설정
       status: notice.status,
     });
-    
+
     // 기존 첨부파일 로드
     try {
-      
+
       const detailResponse = await noticesApi.getAdminNoticeDetail(notice.id);
-      
+
       if (detailResponse.attachments && detailResponse.attachments.length > 0) {
         setUploadedFiles(detailResponse.attachments);
       } else {
@@ -334,7 +328,7 @@ const NoticeManagement = () => {
       setUploadedFiles([]);
       // 첨부파일 로드 실패는 치명적이지 않으므로 에러 토스트는 표시하지 않음
     }
-    
+
     setIsDialogOpen(true);
   };
 
@@ -358,9 +352,9 @@ const NoticeManagement = () => {
     setIsReadStatusDialogOpen(true);
 
     try {
-      
+
       const confirmUsers = await noticesApi.getConfirmList(notice.id);
-      
+
       setReadStatusData({
         confirmUsers: confirmUsers.map(user => ({
           userId: user.userId,
@@ -373,7 +367,7 @@ const NoticeManagement = () => {
     } catch (error: any) {
       console.error("읽음 현황 조회 실패:", error);
       console.error("오류 상세:", error.response?.data || error.message);
-      
+
       // 백엔드 API가 아직 구현되지 않은 경우 더미 데이터 사용
       if (error.response?.status === 404 || error.response?.status === 500) {
         const dummyUsers = [
@@ -467,7 +461,7 @@ const NoticeManagement = () => {
       setIsViewEditMode(false);
     } catch (error: any) {
       console.error("수정 실패:", error);
-      
+
       let errorMessage = "알 수 없는 오류가 발생했습니다.";
       if (error.response?.status === 400) {
         errorMessage = error.response.data?.message || "입력 데이터가 올바르지 않습니다.";
@@ -480,7 +474,7 @@ const NoticeManagement = () => {
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       toast.error(`공지사항 수정에 실패했습니다: ${errorMessage}`);
     } finally {
       setSubmitting(false);
@@ -491,7 +485,7 @@ const NoticeManagement = () => {
   const handleStatusChange = async (noticeId: number, newStatus: string) => {
     toast.error("상태 변경 기능은 현재 준비 중입니다. 수정 버튼을 사용해주세요.");
     return;
-    
+
     /* 백엔드 API 구현 후 활성화
     try {
       console.log("=== 상태 변경 시작 ===");
@@ -535,7 +529,7 @@ const NoticeManagement = () => {
   const handleCategoryChange = async (noticeId: number, newCategory: string) => {
     toast.error("분류 변경 기능은 현재 준비 중입니다. 수정 버튼을 사용해주세요.");
     return;
-    
+
     /* 백엔드 API 구현 후 활성화
     try {
       console.log(`분류 변경 시도: ID ${noticeId}, 새 분류: ${newCategory}`);
@@ -578,7 +572,7 @@ const NoticeManagement = () => {
   const handleTargetChange = async (noticeId: number, newTarget: string) => {
     toast.error("대상 변경 기능은 현재 준비 중입니다. 수정 버튼을 사용해주세요.");
     return;
-    
+
     /* 백엔드 API 구현 후 활성화
     try {
       console.log(`대상 변경 시도: ID ${noticeId}, 새 대상: ${newTarget}`);
@@ -620,9 +614,9 @@ const NoticeManagement = () => {
   const confirmDelete = async () => {
     if (selectedNotice) {
       try {
-        
+
         await noticesApi.deleteNotice(selectedNotice.id);
-        
+
         // UI에서 해당 공지사항 제거 (Soft Delete이므로 목록에서만 제거)
         setNotices((prev) => prev.filter((n) => n.id !== selectedNotice.id));
         toast.success("공지사항이 삭제되었습니다.");
@@ -632,7 +626,7 @@ const NoticeManagement = () => {
         console.error("error.response:", error.response);
         console.error("error.response.data:", error.response?.data);
         console.error("error.response.status:", error.response?.status);
-        
+
         let errorMessage = "알 수 없는 오류가 발생했습니다.";
         if (error.response?.status === 400) {
           errorMessage = "잘못된 요청입니다.";
@@ -647,7 +641,7 @@ const NoticeManagement = () => {
         } else if (error.message) {
           errorMessage = error.message;
         }
-        
+
         toast.error(`공지사항 삭제에 실패했습니다: ${errorMessage}`);
       }
     }
@@ -730,7 +724,7 @@ const NoticeManagement = () => {
 
       if (isEditMode && selectedNotice) {
         await noticesApi.updateNotice(selectedNotice.id, request);
-        
+
         if (isDraft) {
           toast.success("공지사항이 임시저장되었습니다.");
         } else {
@@ -738,7 +732,7 @@ const NoticeManagement = () => {
         }
       } else {
         const noticeId = await noticesApi.createNotice(request);
-        
+
         if (isDraft) {
           toast.success("공지사항이 임시저장되었습니다.");
         } else {
@@ -746,7 +740,7 @@ const NoticeManagement = () => {
           toast.success(`새 공지사항이 ${statusMessage}.`);
         }
       }
-      
+
       await fetchNotices();
       setIsDialogOpen(false);
     } catch (error: any) {
@@ -756,10 +750,10 @@ const NoticeManagement = () => {
       console.error("error.response.data:", error.response?.data);
       console.error("error.response.status:", error.response?.status);
       console.error("error.message:", error.message);
-      
+
       // 구체적인 오류 메시지 처리
       let errorMessage = "알 수 없는 오류가 발생했습니다.";
-      
+
       if (error.response?.status === 400) {
         errorMessage = error.response.data?.message || "입력 데이터가 올바르지 않습니다.";
       } else if (error.response?.status === 401) {
@@ -771,7 +765,7 @@ const NoticeManagement = () => {
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       toast.error(`공지사항 저장에 실패했습니다: ${errorMessage}`);
     } finally {
       setSubmitting(false);
@@ -822,232 +816,231 @@ const NoticeManagement = () => {
     >
       <TooltipProvider>
         <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">공지사항 관리</h1>
-            <p className="text-muted-foreground">공지사항을 작성하고 관리합니다</p>
-          </div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button onClick={handleCreate} className="gap-2">
-                <Plus className="w-4 h-4" />
-                새 공지사항
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>새로운 공지사항 작성</p>
-            </TooltipContent>
-          </Tooltip>
-
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Megaphone className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">전체</p>
-                  <p className="text-xl font-bold">{notices.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center">
-                  <Eye className="w-5 h-5 text-success" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">게시중</p>
-                  <p className="text-xl font-bold">{notices.filter((n) => n.status === "PUBLISHED").length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center">
-                  <Pencil className="w-5 h-5 text-yellow-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">비공개</p>
-                  <p className="text-xl font-bold">{notices.filter((n) => n.status === "DRAFT").length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative flex-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        placeholder="제목, 내용 검색..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-9"
-                      />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>공지사항 제목이나 내용으로 검색</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <Select value={filterCategory} onValueChange={setFilterCategory}>
-                <SelectTrigger className="w-full sm:w-40">
-                  <SelectValue placeholder="분류" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">전체 분류</SelectItem>
-                  <SelectItem value="공지">공지</SelectItem>
-                  <SelectItem value="긴급">긴급</SelectItem>
-                  <SelectItem value="업데이트">업데이트</SelectItem>
-                  <SelectItem value="이벤트">이벤트</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-full sm:w-40">
-                  <SelectValue placeholder="상태" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">전체 상태</SelectItem>
-                  <SelectItem value="PUBLISHED">게시중</SelectItem>
-                  <SelectItem value="DRAFT">비공개</SelectItem>
-                </SelectContent>
-              </Select>
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">공지사항 관리</h1>
+              <p className="text-muted-foreground">공지사항을 작성하고 관리합니다</p>
             </div>
-          </CardContent>
-        </Card>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button onClick={handleCreate} className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  새 공지사항
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>새로운 공지사항 작성</p>
+              </TooltipContent>
+            </Tooltip>
 
-        {/* Notices Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>공지사항 목록</CardTitle>
-            <CardDescription>총 {filteredNotices.length}건</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0 sm:p-6">
-            {filteredNotices.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                공지사항이 없습니다.
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Megaphone className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">전체</p>
+                    <p className="text-xl font-bold">{notices.length}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center">
+                    <Eye className="w-5 h-5 text-success" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">게시중</p>
+                    <p className="text-xl font-bold">{notices.filter((n) => n.status === "PUBLISHED").length}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center">
+                    <Pencil className="w-5 h-5 text-yellow-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">비공개</p>
+                    <p className="text-xl font-bold">{notices.filter((n) => n.status === "DRAFT").length}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filters */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          placeholder="제목, 내용 검색..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-9"
+                        />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>공지사항 제목이나 내용으로 검색</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Select value={filterCategory} onValueChange={setFilterCategory}>
+                  <SelectTrigger className="w-full sm:w-40">
+                    <SelectValue placeholder="분류" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체 분류</SelectItem>
+                    <SelectItem value="공지">공지</SelectItem>
+                    <SelectItem value="긴급">긴급</SelectItem>
+                    <SelectItem value="업데이트">업데이트</SelectItem>
+                    <SelectItem value="이벤트">이벤트</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="w-full sm:w-40">
+                    <SelectValue placeholder="상태" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체 상태</SelectItem>
+                    <SelectItem value="PUBLISHED">게시중</SelectItem>
+                    <SelectItem value="DRAFT">비공개</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12"></TableHead>
-                      <TableHead className="max-w-md">제목</TableHead>
-                      <TableHead className="w-24">분류</TableHead>
-                      <TableHead className="w-32">대상</TableHead>
-                      <TableHead className="w-28">등록일</TableHead>
-                      <TableHead className="w-24">상태</TableHead>
-                      <TableHead className="text-right w-28">관리</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredNotices.map((notice) => (
-                      <TableRow 
-                        key={notice.id}
-                        className={notice.isPinned ? "bg-red-50 border-l-4 border-l-red-500" : ""}
-                      >
-                        <TableCell>
-                          {notice.isPinned && (
-                            <Tooltip>
-                              <TooltipTrigger>
-                                <Pin className="w-4 h-4 text-red-500" />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>중요공지 (상단 고정)</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <button
-                            onClick={() => handleView(notice)}
-                            className={`font-medium line-clamp-1 text-left hover:text-primary hover:underline transition-colors ${
-                              notice.isPinned ? "text-red-700 font-semibold" : ""
-                            }`}
-                          >
-                            {notice.isPinned && "📌 "}
-                            {notice.title}
-                          </button>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={
-                            notice.category === '긴급' ? 'bg-destructive/10 text-destructive border-0' :
-                            notice.category === '공지' ? 'bg-primary/10 text-primary border-0' :
-                            notice.category === '업데이트' ? 'bg-info/10 text-info border-0' :
-                            'bg-success/10 text-success border-0'
-                          }>
-                            {notice.category}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {notice.targetRoles.map((role, idx) => (
-                              <Badge key={idx} variant="outline" className="text-xs">
-                                {role}
-                              </Badge>
-                            ))}
-                          </div>
-                        </TableCell>
-                        <TableCell>{notice.createdAt}</TableCell>
-                        <TableCell>
-                          <Badge className={
-                            notice.status === 'PUBLISHED' ? 'bg-success/10 text-success border-0' :
-                            'bg-gray-100 text-gray-700 border-0'
-                          }>
-                            {notice.status === 'PUBLISHED' ? '게시중' : '비공개'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="sm" onClick={() => handleEdit(notice)}>
-                                  <Settings className="w-4 h-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>수정</p>
-                              </TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="sm" onClick={() => handleDelete(notice)}>
-                                  <Trash2 className="w-4 h-4 text-destructive" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>삭제</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </TableCell>
+            </CardContent>
+          </Card>
+
+          {/* Notices Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>공지사항 목록</CardTitle>
+              <CardDescription>총 {filteredNotices.length}건</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0 sm:p-6">
+              {filteredNotices.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  공지사항이 없습니다.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12"></TableHead>
+                        <TableHead className="max-w-md">제목</TableHead>
+                        <TableHead className="w-24">분류</TableHead>
+                        <TableHead className="w-32">대상</TableHead>
+                        <TableHead className="w-28">등록일</TableHead>
+                        <TableHead className="w-24">상태</TableHead>
+                        <TableHead className="text-right w-28">관리</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredNotices.map((notice) => (
+                        <TableRow
+                          key={notice.id}
+                          className={notice.isPinned ? "bg-red-50 border-l-4 border-l-red-500" : ""}
+                        >
+                          <TableCell>
+                            {notice.isPinned && (
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <Pin className="w-4 h-4 text-red-500" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>중요공지 (상단 고정)</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <button
+                              onClick={() => handleView(notice)}
+                              className={`font-medium line-clamp-1 text-left hover:text-primary hover:underline transition-colors ${notice.isPinned ? "text-red-700 font-semibold" : ""
+                                }`}
+                            >
+                              {notice.isPinned && "📌 "}
+                              {notice.title}
+                            </button>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={
+                              notice.category === '긴급' ? 'bg-destructive/10 text-destructive border-0' :
+                                notice.category === '공지' ? 'bg-primary/10 text-primary border-0' :
+                                  notice.category === '업데이트' ? 'bg-info/10 text-info border-0' :
+                                    'bg-success/10 text-success border-0'
+                            }>
+                              {notice.category}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {notice.targetRoles.map((role, idx) => (
+                                <Badge key={idx} variant="outline" className="text-xs">
+                                  {role}
+                                </Badge>
+                              ))}
+                            </div>
+                          </TableCell>
+                          <TableCell>{notice.createdAt}</TableCell>
+                          <TableCell>
+                            <Badge className={
+                              notice.status === 'PUBLISHED' ? 'bg-success/10 text-success border-0' :
+                                'bg-gray-100 text-gray-700 border-0'
+                            }>
+                              {notice.status === 'PUBLISHED' ? '게시중' : '비공개'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" onClick={() => handleEdit(notice)}>
+                                    <Settings className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>수정</p>
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" onClick={() => handleDelete(notice)}>
+                                    <Trash2 className="w-4 h-4 text-destructive" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>삭제</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </TooltipProvider>
 
       {/* Create/Edit Dialog */}
@@ -1074,8 +1067,8 @@ const NoticeManagement = () => {
                 <Select
                   value={formData.category}
                   onValueChange={(value) => {
-                    setFormData({ 
-                      ...formData, 
+                    setFormData({
+                      ...formData,
                       category: value
                     });
                   }}
@@ -1113,7 +1106,7 @@ const NoticeManagement = () => {
                 </Select>
               </div>
             </div>
-            
+
             {/* 역할 선택 UI */}
             {formData.target === "선택" && (
               <div className="space-y-2">
@@ -1204,8 +1197,8 @@ const NoticeManagement = () => {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                {formData.status === "PUBLISHED" 
-                  ? "공지사항이 즉시 게시되어 사용자들이 볼 수 있습니다." 
+                {formData.status === "PUBLISHED"
+                  ? "공지사항이 즉시 게시되어 사용자들이 볼 수 있습니다."
                   : "공지사항이 비공개 상태로 저장되어 사용자들이 볼 수 없습니다."
                 }
                 <br />
@@ -1313,9 +1306,9 @@ const NoticeManagement = () => {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               취소
             </Button>
-            <Button 
-              variant="secondary" 
-              onClick={() => handleSubmit(true)} 
+            <Button
+              variant="secondary"
+              onClick={() => handleSubmit(true)}
               disabled={submitting}
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
@@ -1323,7 +1316,7 @@ const NoticeManagement = () => {
             </Button>
             <Button onClick={() => handleSubmit(false)} disabled={submitting}>
               {submitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              {isEditMode ? "수정 완료" : 
+              {isEditMode ? "수정 완료" :
                 (formData.status === "PUBLISHED" ? "게시하기" : "비공개로 저장")
               }
             </Button>
@@ -1346,7 +1339,7 @@ const NoticeManagement = () => {
               {selectedNotice?.createdAt}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>제목</Label>
@@ -1360,7 +1353,7 @@ const NoticeManagement = () => {
                 <p className="font-medium text-lg">{selectedNotice?.title}</p>
               )}
             </div>
-            
+
             <div className="space-y-2">
               <Label>내용</Label>
               {isViewEditMode ? (
@@ -1377,15 +1370,15 @@ const NoticeManagement = () => {
               )}
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
               닫기
             </Button>
             {isViewEditMode ? (
               <>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => {
                     setIsViewEditMode(false);
                     setViewFormData({

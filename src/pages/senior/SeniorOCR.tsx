@@ -75,6 +75,8 @@ const SeniorOCR = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
+
+
   // LLM 검증 관련
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
@@ -107,8 +109,6 @@ const SeniorOCR = () => {
       // 라이브러리가 압축 및 EXIF 회전 보정을 자동 수행
       const compressedFile = await imageCompression(file, options);
 
-      console.log(`📸 압축 완료: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
-
       setSelectedFile(compressedFile);
 
       // 압축된 파일로 미리보기 생성
@@ -120,9 +120,9 @@ const SeniorOCR = () => {
 
       // 압축된 파일로 OCR 처리
       processImage(compressedFile);
-    } catch (error) {
-      console.error("이미지 압축 실패:", error);
-      toast.error("사진을 처리하는 데 실패했습니다. 다시 시도해주세요.");
+    } catch (error: any) {
+      const errMsg = error?.message || String(error);
+      toast.error(`이미지 처리 실패: ${errMsg}`);
     }
   };
 
@@ -195,9 +195,9 @@ const SeniorOCR = () => {
             toast.info("기본 방식으로 약 정보를 추출했어요.");
           }
         }
-      } catch (validationError) {
-        console.error("LLM 검증 실패:", validationError);
-        toast.warning("AI 검증에 실패했어요. 기본 방식으로 추출합니다.");
+      } catch (validationError: any) {
+        const errMsg = validationError?.message || String(validationError);
+        toast.warning(`AI 검증 실패: ${errMsg}. 기본 방식으로 추출합니다.`);
 
         // 폴백: 기본 추출 로직
         const medications = extractMedicationNames(result.text);
@@ -214,13 +214,14 @@ const SeniorOCR = () => {
       }
 
     } catch (error: any) {
-      console.error("OCR 처리 실패:", error);
+      // 에러 메시지 추출
+      const errMsg = error?.response?.data?.message || error?.message || String(error);
 
       // 타임아웃 에러 처리
       if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
         toast.error("처리 시간이 너무 오래 걸려요. 더 밝은 곳에서 다시 찍어보세요.");
       } else {
-        toast.error(getErrorMessage(error, "문서를 읽는데 실패했어요."));
+        toast.error(`OCR 실패: ${errMsg}`);
       }
       setExtractedText("");
       setImage(null);
@@ -229,23 +230,38 @@ const SeniorOCR = () => {
     }
   };
 
-  // LLM 검증 API 호출
+  // LLM 검증 API 호출 (Spring Boot 프록시 경유)
   const validateMedicationOCR = async (ocrText: string): Promise<ValidationResult> => {
-    const AI_API_BASE_URL = import.meta.env.VITE_AI_API_BASE_URL || 'http://localhost:8000';
+    // Spring Boot를 통해 Python AI로 프록시
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
-    const response = await fetch(`${AI_API_BASE_URL}/api/ocr/validate-medication`, {
+    const response = await fetch(`${API_BASE_URL}/api/ocr/validate-medication`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include', // 인증 쿠키 포함
       body: JSON.stringify({
-        ocr_text: ocrText,
-        elderly_user_id: user?.id || 0,
+        ocrText: ocrText,  // camelCase for Spring Boot
+        elderlyUserId: user?.id || 0,
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`LLM 검증 실패: ${response.statusText}`);
+      // 에러 응답 본문에서 상세 메시지 추출
+      let errorDetail = response.statusText;
+      try {
+        const errorBody = await response.json();
+        errorDetail = errorBody?.detail || errorBody?.message || errorBody?.errorMessage || JSON.stringify(errorBody);
+      } catch {
+        // JSON 파싱 실패 시 텍스트로 시도
+        try {
+          errorDetail = await response.text();
+        } catch {
+          // 무시
+        }
+      }
+      throw new Error(`AI 검증 실패(${response.status}): ${errorDetail}`);
     }
 
     return response.json();
@@ -458,7 +474,6 @@ const SeniorOCR = () => {
           reminder: true,
         };
 
-        console.log("복약 등록 요청:", request);
         await medicationsApi.createMedication(request);
         successCount++;
       }
@@ -471,8 +486,6 @@ const SeniorOCR = () => {
         toast.error("등록된 약이 없습니다.");
       }
     } catch (error: any) {
-      console.error("Failed to register medications:", error);
-      console.error("에러 응답:", error.response?.data);
 
       const errorMessage = error.response?.data?.message
         || error.response?.data?.error

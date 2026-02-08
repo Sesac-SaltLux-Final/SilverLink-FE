@@ -154,7 +154,7 @@ const GuardianSensitiveInfo = () => {
         setMyElderly(data ? [data] : []);
       }
     } catch (error) {
-      console.error("Failed to fetch my elderly:", error);
+      // Failed to fetch my elderly
     }
   };
 
@@ -162,7 +162,7 @@ const GuardianSensitiveInfo = () => {
     try {
       setLoading(true);
       const data = await accessRequestsApi.getMyRequests();
-      console.log("[GuardianSensitiveInfo] fetchRequests raw data:", data);
+
 
       const mappedRequests: RequestItem[] = data.map(r => ({
         id: r.id,
@@ -178,10 +178,10 @@ const GuardianSensitiveInfo = () => {
         reviewedBy: r.reviewedBy,
         accessGranted: r.accessGranted,
       }));
-      console.log("[GuardianSensitiveInfo] mappedRequests:", mappedRequests);
+
       setRequests(mappedRequests);
     } catch (error: any) {
-      console.error("Failed to fetch requests:", error);
+      // Failed to fetch requests
       toast.error("요청 목록을 불러오는 중 오류가 발생했습니다.");
       setRequests([]);
     } finally {
@@ -285,7 +285,7 @@ const GuardianSensitiveInfo = () => {
       setNewRequest({ elderlyName: "", elderlyUserId: 0, infoTypes: [] });
       fetchRequests();
     } catch (error: any) {
-      console.error("Request failed:", error);
+      // Request failed
       const message = error?.response?.data?.message || "요청 전송에 실패했습니다.";
       toast.error(message);
     }
@@ -301,7 +301,7 @@ const GuardianSensitiveInfo = () => {
       setCancelTarget(null);
       fetchRequests();
     } catch (error: any) {
-      console.error("Cancel failed:", error);
+      // Cancel failed
       const message = error?.response?.data?.message || "요청 취소에 실패했습니다.";
       toast.error(message);
     }

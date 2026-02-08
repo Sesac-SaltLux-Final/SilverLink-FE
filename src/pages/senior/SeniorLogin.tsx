@@ -117,9 +117,7 @@ const SeniorLogin = () => {
 
     setIsSending(true);
     try {
-      console.log("인증번호 발송 요청:", { phone: digits, purpose: "DEVICE_REGISTRATION" });
       const response = await requestVerificationCode(digits, "DEVICE_REGISTRATION");
-      console.log("인증번호 발송 응답:", response);
 
       setVerificationId(response.verificationId);
       setIsCodeSent(true);
@@ -140,15 +138,7 @@ const SeniorLogin = () => {
         description: "문자 메시지를 확인해주세요.",
       });
     } catch (err: any) {
-      console.error("인증번호 발송 실패:", err);
-      console.error("에러 상세:", {
-        message: err?.message,
-        response: err?.response?.data,
-        status: err?.response?.status,
-      });
-
       const errorMessage = getErrorMessage(err, "인증번호 발송에 실패했어요.");
-      console.log("표시할 에러 메시지:", errorMessage);
       toast.error(errorMessage);
     } finally {
       setIsSending(false);
@@ -183,7 +173,7 @@ const SeniorLogin = () => {
               const userProfile = profileResponse.data;
               login(loginResponse.data.accessToken, userProfile);
             } catch (profileErr) {
-              console.error('프로필 조회 실패:', profileErr);
+              // 프로필 조회 실패
               // 프로필 조회 실패해도 기본 정보로 로그인 처리
               login(loginResponse.data.accessToken, {
                 id: 0,
@@ -240,7 +230,6 @@ const SeniorLogin = () => {
         toast.error(error);
       }
     } catch (err) {
-      console.error("Biometric login error:", err);
       toast.error("지문 인증 중 오류가 발생했어요. 다시 시도해주세요.");
     }
   };

@@ -259,7 +259,6 @@ const SeniorMedication = () => {
         const data = await medicationsApi.getMyMedications();
         setMedications(data.map(mapToLocal));
       } catch (error) {
-        console.error("복약 목록 로드 실패:", error);
         // 로그인되지 않은 경우 빈 목록 유지
         setMedications([]);
       } finally {
@@ -293,8 +292,6 @@ const SeniorMedication = () => {
       // 라이브러리가 압축 및 EXIF 회전 보정을 자동 수행
       const compressedFile = await imageCompression(file, options);
 
-      console.log(`📸 압축 완료: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
-
       // 압축된 파일로 미리보기 생성
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -305,7 +302,6 @@ const SeniorMedication = () => {
       // 압축된 파일로 OCR 처리
       processImage(compressedFile);
     } catch (error) {
-      console.error("이미지 압축 실패:", error);
       toast.error("사진을 처리하는 데 실패했습니다. 다시 시도해주세요.");
     }
   };
@@ -361,7 +357,6 @@ const SeniorMedication = () => {
       setShowOCRConfirmDialog(true);
       toast.success("약 정보를 읽었어요!");
     } catch (error: any) {
-      console.error("OCR 처리 실패:", error);
 
       // 타임아웃 에러 처리
       if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
@@ -415,16 +410,12 @@ const SeniorMedication = () => {
           reminder: true,
         };
 
-        console.log("복약 등록 요청:", request);
-
         const response = await medicationsApi.createMedication(request);
         setMedications([...medications, mapToLocal(response)]);
         toast.success("복약 일정이 등록되었어요!");
         setShowOCRConfirmDialog(false);
         resetCapture();
       } catch (error: any) {
-        console.error("복약 등록 실패:", error);
-        console.error("에러 응답:", error.response?.data);
 
         const errorMessage = error.response?.data?.message
           || error.response?.data?.error
@@ -483,16 +474,12 @@ const SeniorMedication = () => {
         reminder: true,
       };
 
-      console.log("복약 등록 요청:", request);
-
       const response = await medicationsApi.createMedication(request);
       setMedications([...medications, mapToLocal(response)]);
       resetForm();
       setShowAddDialog(false);
       toast.success("복약 일정이 등록되었어요!");
     } catch (error: any) {
-      console.error("복약 등록 실패:", error);
-      console.error("에러 응답:", error.response?.data);
 
       const errorMessage = error.response?.data?.message
         || error.response?.data?.error
@@ -517,7 +504,6 @@ const SeniorMedication = () => {
       setMedications(medications.filter(m => m.id !== id));
       toast.success("복약 일정이 삭제되었어요");
     } catch (error) {
-      console.error("삭제 실패:", error);
       toast.error("삭제에 실패했습니다.");
     }
   };
@@ -529,7 +515,6 @@ const SeniorMedication = () => {
         m.id === id ? { ...m, reminder: response.reminder } : m
       ));
     } catch (error) {
-      console.error("알림 토글 실패:", error);
       toast.error("설정 변경에 실패했습니다.");
     }
   };
