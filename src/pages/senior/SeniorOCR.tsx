@@ -30,6 +30,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import ocrApi from "@/api/ocr";
+import apiClient from "@/api";
 import medicationsApi, { MedicationRequest } from "@/api/medications";
 import { getErrorMessage } from "@/utils/errorUtils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -232,39 +233,13 @@ const SeniorOCR = () => {
 
   // LLM 검증 API 호출 (Spring Boot 프록시 경유)
   const validateMedicationOCR = async (ocrText: string): Promise<ValidationResult> => {
-    // Spring Boot를 통해 Python AI로 프록시
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
-
-    const response = await fetch(`${API_BASE_URL}/api/ocr/validate-medication`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include', // 인증 쿠키 포함
-      body: JSON.stringify({
-        ocrText: ocrText,  // camelCase for Spring Boot
-        elderlyUserId: user?.id || 0,
-      }),
+    // apiClient를 통해 요청 (baseURL 및 인증 처리 일관성)
+    const response = await apiClient.post('/api/ocr/validate-medication', {
+      ocrText: ocrText,
+      elderlyUserId: user?.id || 0,
     });
 
-    if (!response.ok) {
-      // 에러 응답 본문에서 상세 메시지 추출
-      let errorDetail = response.statusText;
-      try {
-        const errorBody = await response.json();
-        errorDetail = errorBody?.detail || errorBody?.message || errorBody?.errorMessage || JSON.stringify(errorBody);
-      } catch {
-        // JSON 파싱 실패 시 텍스트로 시도
-        try {
-          errorDetail = await response.text();
-        } catch {
-          // 무시
-        }
-      }
-      throw new Error(`AI 검증 실패(${response.status}): ${errorDetail}`);
-    }
-
-    return response.json();
+    return response.data;
   };
 
   // OCR 텍스트 정제 함수
