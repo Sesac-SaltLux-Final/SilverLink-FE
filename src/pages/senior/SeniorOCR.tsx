@@ -99,12 +99,13 @@ const SeniorOCR = () => {
     try {
       toast.info("이미지 최적화 중...");
 
-      // 압축 옵션 설정
+      // 압축 옵션 설정 (Luxia OCR API 제한 대응)
       const options = {
-        maxSizeMB: 1,          // 1MB 이하로 압축 (WAF/Spring 제한 통과)
-        maxWidthOrHeight: 1920, // FHD 수준 리사이징 (OCR 인식률 최적)
+        maxSizeMB: 0.3,         // 300KB 이하로 압축 (Luxia 안정성 향상)
+        maxWidthOrHeight: 1280, // HD 수준 리사이징 (OCR에 충분)
         useWebWorker: true,     // 메인 스레드 멈춤 방지
-        fileType: 'image/jpeg'  // 호환성 좋은 포맷으로 변환
+        fileType: 'image/jpeg', // 호환성 좋은 포맷으로 변환
+        initialQuality: 0.7     // JPEG 품질 70% (파일 크기 감소)
       };
 
       // 라이브러리가 압축 및 EXIF 회전 보정을 자동 수행
