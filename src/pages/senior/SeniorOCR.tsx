@@ -5,6 +5,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import imageCompression from "browser-image-compression";
 import {
+  processImageForUpload,
+  formatFileSize,
+  type ImageProcessingResult,
+  type ProcessingStage,
+} from "@/utils/imageProcessor";
+import {
   Heart,
   ArrowLeft,
   Camera,
@@ -16,6 +22,10 @@ import {
   Pill,
   Plus,
   Check,
+  ImageIcon,
+  Zap,
+  HardDrive,
+  Timer,
   AlertCircle
 } from "lucide-react";
 import {
@@ -76,7 +86,9 @@ const SeniorOCR = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
-
+  // 이미지 처리 메트릭 (포트폴리오용 시각화)
+  const [imageStats, setImageStats] = useState<ImageProcessingResult | null>(null);
+  const [processingStage, setProcessingStage] = useState<ProcessingStage>('loading');
 
   // LLM 검증 관련
   const [isValidating, setIsValidating] = useState(false);
@@ -99,29 +111,40 @@ const SeniorOCR = () => {
     try {
       toast.info("이미지 최적화 중...");
 
-      // 압축 옵션 설정 (Luxia OCR API 제한 대응)
-      const options = {
-        maxSizeMB: 0.3,         // 300KB 이하로 압축 (Luxia 안정성 향상)
-        maxWidthOrHeight: 1280, // HD 수준 리사이징 (OCR에 충분)
-        useWebWorker: true,     // 메인 스레드 멈춤 방지
-        fileType: 'image/jpeg', // 호환성 좋은 포맷으로 변환
-        initialQuality: 0.7     // JPEG 품질 70% (파일 크기 감소)
+      // ── 1단계: Canvas 기반 리사이징 + JPEG 압축 + Base64 프리뷰 ──
+      // processImageForUpload 파이프라인:
+      //   File → loadImage → Canvas 리사이즈(max 1920px)
+      //        → JPEG 압축(85%) → Base64 인코딩 → 메트릭 수집
+      const result = await processImageForUpload(
+        file,
+        { maxWidth: 1920, maxHeight: 1920, quality: 0.85 },
+        (stage) => setProcessingStage(stage),
+      );
+
+      // 처리 메트릭 저장 (UI에 시각화)
+      setImageStats(result);
+      // Base64 Data URL로 즉시 프리뷰 표시 (네트워크 요청 불필요)
+      setImage(result.base64Preview);
+
+      // ── 2단계: OCR API용 추가 압축 (Luxia API 제한 대응) ──
+      const ocrOptions = {
+        maxSizeMB: 0.3,         // 300KB 이하로 압축
+        maxWidthOrHeight: 1280, // HD 수준으로 축소 (OCR에 충분)
+        useWebWorker: true,     // Web Worker로 메인 스레드 블로킹 방지
+        fileType: 'image/jpeg' as const,
+        initialQuality: 0.7,    // JPEG 품질 70%
       };
 
-      // 라이브러리가 압축 및 EXIF 회전 보정을 자동 수행
-      const compressedFile = await imageCompression(file, options);
+      // browser-image-compression이 EXIF 회전 보정까지 자동 수행
+      const ocrFile = await imageCompression(result.file, ocrOptions);
+      setSelectedFile(ocrFile);
 
-      setSelectedFile(compressedFile);
+      toast.success(
+        `이미지 최적화 완료! (${formatFileSize(result.originalSize)} → ${formatFileSize(result.processedSize)}, ${result.compressionRatio}% 감소)`,
+      );
 
-      // 압축된 파일로 미리보기 생성
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImage(reader.result as string);
-      };
-      reader.readAsDataURL(compressedFile);
-
-      // 압축된 파일로 OCR 처리
-      processImage(compressedFile);
+      // 최적화된 이미지로 OCR 파이프라인 시작
+      processImage(ocrFile);
     } catch (error: any) {
       const errMsg = error?.message || String(error);
       toast.error(`이미지 처리 실패: ${errMsg}`);
@@ -331,19 +354,12 @@ const SeniorOCR = () => {
     return medications.slice(0, 5);
   };
 
-  // 약 카테고리 추출
+  // 약 카테고리 추출 (LLM 응답 우선, 없으면 "기타")
   const getMedicationCategory = (med: MedicationInfo): string => {
-    const name = med.medication_name;
-    const lower = name.toLowerCase();
-
-    if (lower.includes("혈압") || lower.includes("amlod") || lower.includes("losar") || lower.includes("norvasc")) return "혈압약";
-    if (lower.includes("당뇨") || lower.includes("metfor") || lower.includes("glim") || lower.includes("jardiance")) return "당뇨약";
-    if (lower.includes("감기") || lower.includes("타이레놀") || lower.includes("acetam") || lower.includes("cold")) return "감기약";
-    if (lower.includes("위") || lower.includes("omep") || lower.includes("panto") || lower.includes("nexium")) return "위장약";
-    if (lower.includes("진통") || lower.includes("ibup") || lower.includes("aspir") || lower.includes("celebrex")) return "진통제";
-    if (lower.includes("수면") || lower.includes("zolp") || lower.includes("stilnox")) return "수면제";
-    if (lower.includes("비타민") || lower.includes("vitam")) return "비타민";
-
+    // LLM이 분류한 category가 있으면 그대로 사용
+    if (med.category && MEDICATION_CATEGORIES[med.category]) {
+      return med.category;
+    }
     return "기타";
   };
 
@@ -381,6 +397,8 @@ const SeniorOCR = () => {
     setExtractedMedications([]);
     setSelectedMedications(new Set());
     setValidationResult(null);
+    setImageStats(null);
+    setProcessingStage('loading');
   };
 
   const handleOpenMedicationDialog = () => {
@@ -552,7 +570,7 @@ const SeniorOCR = () => {
           </Card>
         )}
 
-        {/* Processing State */}
+        {/* Processing State – 단계별 진행 상태 표시 */}
         {(isProcessing || isValidating) && (
           <Card>
             <CardContent className="p-12">
@@ -560,7 +578,15 @@ const SeniorOCR = () => {
                 <Loader2 className="w-16 h-16 mx-auto text-info animate-spin" />
                 <div>
                   <p className="text-xl font-bold">
-                    {isValidating ? "약 정보를 검증하고 있어요..." : "약봉지를 읽고 있어요..."}
+                    {isValidating
+                      ? "약 정보를 검증하고 있어요..."
+                      : processingStage === 'resizing'
+                        ? "이미지 리사이징 중..."
+                        : processingStage === 'compressing'
+                          ? "JPEG 압축 중..."
+                          : processingStage === 'encoding'
+                            ? "프리뷰 생성 중..."
+                            : "약봉지를 읽고 있어요..."}
                   </p>
                   <p className="text-muted-foreground mt-2">잠시만 기다려주세요</p>
                 </div>
@@ -582,6 +608,58 @@ const SeniorOCR = () => {
                 />
               </CardContent>
             </Card>
+
+            {/* ── 이미지 처리 통계 카드 ── */}
+            {imageStats && (
+              <Card className="border-info/30 bg-gradient-to-br from-info/5 to-transparent">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Zap className="w-5 h-5 text-info" />
+                    <span className="font-bold text-base text-info">이미지 최적화 결과</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* 원본 크기 */}
+                    <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                      <HardDrive className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground">원본</p>
+                        <p className="font-bold text-sm truncate">{formatFileSize(imageStats.originalSize)}</p>
+                      </div>
+                    </div>
+                    {/* 압축 크기 */}
+                    <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                      <HardDrive className="w-4 h-4 text-info shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground">최적화 후</p>
+                        <p className="font-bold text-sm truncate">{formatFileSize(imageStats.processedSize)}</p>
+                      </div>
+                    </div>
+                    {/* 해상도 변화 */}
+                    <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                      <ImageIcon className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground">해상도</p>
+                        <p className="font-bold text-sm truncate">
+                          {imageStats.wasResized
+                            ? `${imageStats.originalDimensions.width}×${imageStats.originalDimensions.height} → ${imageStats.processedDimensions.width}×${imageStats.processedDimensions.height}`
+                            : `${imageStats.processedDimensions.width}×${imageStats.processedDimensions.height}`}
+                        </p>
+                      </div>
+                    </div>
+                    {/* 압축률 & 처리 시간 */}
+                    <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                      <Timer className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground">압축률 / 소요시간</p>
+                        <p className="font-bold text-sm truncate">
+                          {imageStats.compressionRatio}% 감소 · {imageStats.processingTimeMs}ms
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Extracted Medications */}
             {extractedMedications.length > 0 && (
